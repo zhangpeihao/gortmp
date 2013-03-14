@@ -1,5 +1,6 @@
 // Copyright 2013, zhangpeihao All rights reserved.
 
+// RTMP protocol golang implementation
 package rtmp
 
 // Chunk Message Header - "fmt" field values
