@@ -29,13 +29,14 @@ var testBaseHeaderCases = []TestBaseHeaderCase{
 func TestReadBaseHeader(t *testing.T) {
 	for _, c := range testBaseHeaderCases {
 		buf := bytes.NewReader(c.data)
-		fmt, csi, err := ReadBaseHeader(buf)
+		n, fmt, csi, err := ReadBaseHeader(buf)
 		if err != nil {
 			t.Errorf("TestReadBaseHeader(%s - fmt: %d, csi: %d) error: %s", c.name, c.fmt, c.csi, err.Error())
 			continue
 		}
-		if fmt != c.fmt || csi != c.csi {
-			t.Errorf("TestReadBaseHeader(%s - fmt: %d, csi: %d) got: fmt: %d, csi: %d", c.name, c.fmt, c.csi, fmt, csi)
+		if fmt != c.fmt || csi != c.csi || n != len(c.data) {
+			t.Errorf("TestReadBaseHeader(%s - n: %d, fmt: %d, csi: %d) got: n: %d, fmt: %d, csi: %d",
+				len(c.data), c.name, c.fmt, c.csi, n, fmt, csi)
 		}
 	}
 }
@@ -55,7 +56,7 @@ var testHeaderCases = []TestHeaderCase{
 			0x00, 0x00, 0x01, // Timestamp
 			0x00, 0x00, 0x02, // Message Length
 			0x03,                   // Message Type ID
-			0x00, 0x00, 0x00, 0x04, // Message Stream ID
+			0x04, 0x00, 0x00, 0x00, // Message Stream ID
 		},
 		[]byte{0x03},
 		Header{
@@ -75,7 +76,7 @@ var testHeaderCases = []TestHeaderCase{
 			0xff, 0xff, 0xff, // Timestamp
 			0x00, 0x00, 0x02, // Message Length
 			0x03,                   // Message Type ID
-			0x00, 0x00, 0x00, 0x04, // Message Stream ID
+			0x04, 0x00, 0x00, 0x00, // Message Stream ID
 			0x10, 0x00, 0x00, 0x00, // Externed timestamp
 		},
 		[]byte{0x03},
@@ -185,13 +186,16 @@ func TestReadHeader(t *testing.T) {
 	header := &Header{}
 	for _, c := range testHeaderCases {
 		buf := bytes.NewReader(c.data)
-		err := header.ReadHeader(buf, c.header.Fmt, c.header.ChunkStreamID)
+		n, err := header.ReadHeader(buf, c.header.Fmt, c.header.ChunkStreamID)
 		if err != nil {
 			t.Errorf("TestReadHeader(%s)\n\t%v\nerror: %s", c.name, c.header, err.Error())
 			continue
 		}
 		if *header != c.header {
-			t.Errorf("TestReadHeader(%s)\n\texpect: %v\n\tgot:%v", c.name, c.header, *header)
+			t.Errorf("TestReadHeader(%s)\n\texpect: %v\n\tgot:   %v", c.name, c.header, *header)
+		}
+		if n != len(c.data) {
+			t.Errorf("TestReadHeader(%s)\n\texpect n: %d\n\tgot n:   %d", c.name, len(c.data), n)
 		}
 	}
 }
@@ -210,7 +214,7 @@ func TestWriteHeader(t *testing.T) {
 		}
 		got := buf.Bytes()
 		if !bytes.Equal(expect, got) {
-			t.Errorf("TestWriteHeader(%s)\n\texpect: % x\n\tgot:% x", c.name, expect, got)
+			t.Errorf("TestWriteHeader(%s)\n\texpect: % x\n\tgot:   % x", c.name, expect, got)
 		}
 	}
 }

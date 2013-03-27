@@ -3,10 +3,9 @@
 package rtmp
 
 import (
-	"bufio"
 	"encoding/binary"
 	"errors"
-	"io"
+	"fmt"
 )
 
 // RTMP Chunk Header
@@ -54,37 +53,40 @@ type Header struct {
 
 // Read Base Header from io.Reader
 // High level protocol can use chunk stream ID to query the previous header instance.
-func ReadBaseHeader(r io.Reader) (fmt uint8, csi uint32, err error) {
-	rbuf := bufio.NewReader(r)
+func ReadBaseHeader(rbuf Reader) (n int, fmt uint8, csi uint32, err error) {
 	var b byte
-	b, err = rbuf.ReadByte()
+	b, err = ReadByteFromNetwork(rbuf)
 	if err != nil {
 		return
 	}
+	n = 1
 	fmt = uint8(b >> 6)
 	b = b & 0x3f
 	switch b {
 	case 0:
 		// Chunk stream IDs 64-319 can be encoded in the 2-byte version of this
 		// field. ID is computed as (the second byte + 64).
-		b, err = rbuf.ReadByte()
+		b, err = ReadByteFromNetwork(rbuf)
 		if err != nil {
 			return
 		}
+		n += 1
 		csi = uint32(64) + uint32(b)
 	case 1:
 		// Chunk stream IDs 64-65599 can be encoded in the 3-byte version of
 		// this field. ID is computed as ((the third byte)*256 + the second byte
 		// + 64).
-		b, err = rbuf.ReadByte()
+		b, err = ReadByteFromNetwork(rbuf)
 		if err != nil {
 			return
 		}
+		n += 1
 		csi = uint32(64) + uint32(b)
-		b, err = rbuf.ReadByte()
+		b, err = ReadByteFromNetwork(rbuf)
 		if err != nil {
 			return
 		}
+		n += 1
 		csi += uint32(b) * 256
 	default:
 		// Chunk stream IDs 2-63 can be encoded in the 1-byte version of this
@@ -95,10 +97,9 @@ func ReadBaseHeader(r io.Reader) (fmt uint8, csi uint32, err error) {
 }
 
 // Read new chunk stream header from io.Reader
-func (header *Header) ReadHeader(r io.Reader, fmt uint8, csi uint32) (err error) {
-	header.Fmt = fmt
+func (header *Header) ReadHeader(rbuf Reader, vfmt uint8, csi uint32) (n int, err error) {
+	header.Fmt = vfmt
 	header.ChunkStreamID = csi
-	rbuf := bufio.NewReader(r)
 	var b byte
 	tmpBuf := make([]byte, 4)
 	switch header.Fmt {
@@ -117,26 +118,30 @@ func (header *Header) ReadHeader(r io.Reader, fmt uint8, csi uint32) (err error)
 		// |           message stream id (cont)            |
 		// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 		//       Figure 9 Chunk Message Header – Type 0
-		_, err = io.ReadAtLeast(rbuf, tmpBuf[1:], 3)
+		_, err = ReadAtLeastFromNetwork(rbuf, tmpBuf[1:], 3)
 		if err != nil {
 			return
 		}
+		n += 3
 		header.Timestamp = binary.BigEndian.Uint32(tmpBuf)
-		_, err = io.ReadAtLeast(rbuf, tmpBuf[1:], 3)
+		_, err = ReadAtLeastFromNetwork(rbuf, tmpBuf[1:], 3)
 		if err != nil {
 			return
 		}
+		n += 3
 		header.MessageLength = binary.BigEndian.Uint32(tmpBuf)
-		b, err = rbuf.ReadByte()
+		b, err = ReadByteFromNetwork(rbuf)
 		if err != nil {
 			return
 		}
+		n += 1
 		header.MessageTypeID = uint8(b)
-		_, err = io.ReadAtLeast(rbuf, tmpBuf, 4)
+		_, err = ReadAtLeastFromNetwork(rbuf, tmpBuf, 4)
 		if err != nil {
 			return
 		}
-		header.MessageStreamID = binary.BigEndian.Uint32(tmpBuf)
+		n += 4
+		header.MessageStreamID = binary.LittleEndian.Uint32(tmpBuf)
 	case HEADER_FMT_SAME_STREAM:
 		// Chunks of Type 1 are 7 bytes long. The message stream ID is not
 		// included; this chunk takes the same stream ID as the preceding chunk.
@@ -152,20 +157,23 @@ func (header *Header) ReadHeader(r io.Reader, fmt uint8, csi uint32) (err error)
 		// |     message length (cont)     |message type id|
 		// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 		//       Figure 10 Chunk Message Header – Type 1
-		_, err = io.ReadAtLeast(rbuf, tmpBuf[1:], 3)
+		_, err = ReadAtLeastFromNetwork(rbuf, tmpBuf[1:], 3)
 		if err != nil {
 			return
 		}
+		n += 3
 		header.Timestamp = binary.BigEndian.Uint32(tmpBuf)
-		_, err = io.ReadAtLeast(rbuf, tmpBuf[1:], 3)
+		_, err = ReadAtLeastFromNetwork(rbuf, tmpBuf[1:], 3)
 		if err != nil {
 			return
 		}
+		n += 3
 		header.MessageLength = binary.BigEndian.Uint32(tmpBuf)
-		b, err = rbuf.ReadByte()
+		b, err = ReadByteFromNetwork(rbuf)
 		if err != nil {
 			return
 		}
+		n += 1
 		header.MessageTypeID = uint8(b)
 
 	case HEADER_FMT_SAME_LENGTH_AND_STREAM:
@@ -181,10 +189,11 @@ func (header *Header) ReadHeader(r io.Reader, fmt uint8, csi uint32) (err error)
 		// |                timestamp delta                |
 		// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 		//       Figure 11 Chunk Message Header – Type 2
-		_, err = io.ReadAtLeast(rbuf, tmpBuf[1:], 3)
+		_, err = ReadAtLeastFromNetwork(rbuf, tmpBuf[1:], 3)
 		if err != nil {
 			return
 		}
+		n += 3
 		header.Timestamp = binary.BigEndian.Uint32(tmpBuf)
 
 	case HEADER_FMT_CONTINUATION:
@@ -212,11 +221,13 @@ func (header *Header) ReadHeader(r io.Reader, fmt uint8, csi uint32) (err error)
 	// Todo: Test with FMS
 	if header.Fmt != HEADER_FMT_CONTINUATION {
 		if header.Timestamp >= 0xffffff {
-			_, err = io.ReadAtLeast(rbuf, tmpBuf, 4)
+			_, err = ReadAtLeastFromNetwork(rbuf, tmpBuf, 4)
 			if err != nil {
 				return
 			}
+			n += 4
 			header.ExtendedTimestamp = binary.BigEndian.Uint32(tmpBuf)
+			fmt.Printf("Extened timestamp: %d, timestamp: %d\n", header.ExtendedTimestamp, header.Timestamp)
 		} else {
 			header.ExtendedTimestamp = 0
 		}
@@ -224,14 +235,8 @@ func (header *Header) ReadHeader(r io.Reader, fmt uint8, csi uint32) (err error)
 	return
 }
 
-// Check header is absolute
-func (header *Header) IsAbsolute() bool {
-	return header.Fmt == HEADER_FMT_FULL
-}
-
 // Encode header into io.Writer
-func (header *Header) Write(w io.Writer) (n int, err error) {
-	wbuf := bufio.NewWriter(w)
+func (header *Header) Write(wbuf Writer) (n int, err error) {
 	// Write fmt & Chunk stream ID
 	switch {
 	case header.ChunkStreamID <= 63:
@@ -291,7 +296,7 @@ func (header *Header) Write(w io.Writer) (n int, err error) {
 		}
 		n += 1
 		// Message Stream ID
-		err = binary.Write(wbuf, binary.BigEndian, &(header.MessageStreamID))
+		err = binary.Write(wbuf, binary.LittleEndian, &(header.MessageStreamID))
 		if err != nil {
 			return
 		}
@@ -338,6 +343,18 @@ func (header *Header) Write(w io.Writer) (n int, err error) {
 		}
 		n += 4
 	}
-	err = wbuf.Flush()
 	return
+}
+
+func (header *Header) RealTimestamp() uint32 {
+	if header.Timestamp >= 0xffffff {
+		return header.ExtendedTimestamp
+	}
+	return header.Timestamp
+}
+
+func (header *Header) Dump(name string) {
+	fmt.Printf("Header(%s){Fmt: %d, ChunkStreamID: %d, Timestamp: %d, MessageLength: %d, MessageTypeID: %d, MessageStreamID: %d, ExtendedTimestamp: %d}\n", name,
+		header.Fmt, header.ChunkStreamID, header.Timestamp, header.MessageLength,
+		header.MessageTypeID, header.MessageStreamID, header.ExtendedTimestamp)
 }
