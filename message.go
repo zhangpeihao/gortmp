@@ -14,18 +14,19 @@ import (
 // video messages for sending video data, data messages for sending any
 // user data, shared object messages, and command messages.
 type Message struct {
-	ChunkStreamID uint32
-	Timestamp     uint32
-	Size          uint32
-	Type          uint8
-	StreamID      uint32
-	Buf           *bytes.Buffer
+	ChunkStreamID     uint32
+	Timestamp         uint32
+	Size              uint32
+	Type              uint8
+	StreamID          uint32
+	Buf               *bytes.Buffer
+	IsInbound         bool
+	AbsoluteTimestamp uint32
 }
 
-func NewMessage(csi uint32, t uint8, tsp, sid uint32, data []byte) *Message {
+func NewMessage(csi uint32, t uint8, sid uint32, data []byte) *Message {
 	message := &Message{
 		ChunkStreamID: csi,
-		Timestamp:     tsp,
 		Type:          t,
 		StreamID:      sid,
 		Buf:           new(bytes.Buffer),
@@ -38,8 +39,8 @@ func NewMessage(csi uint32, t uint8, tsp, sid uint32, data []byte) *Message {
 }
 
 func (message *Message) Dump(name string) {
-	fmt.Printf("Message(%s){CID: %d, Type: %d, Timestamp: %d, Size: %d, StreamID: %d}\n", name,
-		message.ChunkStreamID, message.Type, message.Timestamp, message.Size, message.StreamID)
+	fmt.Printf("Message(%s){CID: %d, Type: %d, Timestamp: %d, Size: %d, StreamID: %d, IsInbound: %t, AbsoluteTimestamp: %d}\n", name,
+		message.ChunkStreamID, message.Type, message.Timestamp, message.Size, message.StreamID, message.IsInbound, message.AbsoluteTimestamp)
 }
 
 // The length of remain data to read

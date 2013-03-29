@@ -219,19 +219,20 @@ func (header *Header) ReadHeader(rbuf Reader, vfmt uint8, csi uint32) (n int, er
 	// present. Type 3 chunks MUST NOT have this field.
 	// !!!!!! crtmpserver set this field in Type 3 !!!!!!
 	// Todo: Test with FMS
-	if header.Fmt != HEADER_FMT_CONTINUATION {
-		if header.Timestamp >= 0xffffff {
-			_, err = ReadAtLeastFromNetwork(rbuf, tmpBuf, 4)
-			if err != nil {
-				return
-			}
-			n += 4
-			header.ExtendedTimestamp = binary.BigEndian.Uint32(tmpBuf)
-			fmt.Printf("Extened timestamp: %d, timestamp: %d\n", header.ExtendedTimestamp, header.Timestamp)
-		} else {
-			header.ExtendedTimestamp = 0
+	//if header.Fmt != HEADER_FMT_CONTINUATION {
+	if header.Timestamp >= 0xffffff {
+		_, err = ReadAtLeastFromNetwork(rbuf, tmpBuf, 4)
+		if err != nil {
+			return
 		}
+		n += 4
+		header.ExtendedTimestamp = binary.BigEndian.Uint32(tmpBuf)
+		fmt.Printf("Extened timestamp: %d, timestamp: %d\n", header.ExtendedTimestamp, header.Timestamp)
+		header.Dump("Extended timestamp")
+	} else {
+		header.ExtendedTimestamp = 0
 	}
+	//}
 	return
 }
 

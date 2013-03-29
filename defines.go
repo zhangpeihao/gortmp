@@ -4,6 +4,7 @@
 package rtmp
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"github.com/zhangpeihao/goamf"
@@ -26,8 +27,9 @@ const (
 
 // Result codes
 const (
-	RESULT_CONNECT_OK    = "NetConnection.Connect.Success"
-	NETSTREAM_PLAY_START = "NetStream.Play.Start"
+	RESULT_CONNECT_OK       = "NetConnection.Connect.Success"
+	NETSTREAM_PLAY_START    = "NetStream.Play.Start"
+	NETSTREAM_PUBLISH_START = "NetStream.Publish.Start"
 )
 
 // Chunk stream ID
@@ -454,6 +456,81 @@ func CopyNFromNetwork(dst Writer, src Reader, n int64) (written int64, err error
 			err = er
 			break
 		}
+	}
+	return
+}
+
+func WriteToNetwork(w Writer, data []byte) (written int, err error) {
+	length := len(data)
+	var n int
+	for written < length {
+		n, err = w.Write(data[written:])
+		if err == nil {
+			written += int(n)
+			continue
+		}
+		netErr, ok := err.(net.Error)
+		if !ok {
+			return
+		}
+		if !netErr.Temporary() {
+			return
+		}
+		fmt.Println("WriteToNetwork !!!!!!!!!!!!!!!!!!")
+		time.Sleep(500 * time.Millisecond)
+	}
+	return
+
+}
+
+// Copy bytes to network
+func CopyNToNetwork(dst Writer, src Reader, n int64) (written int64, err error) {
+	// return io.CopyN(dst, src, n)
+
+	buf := make([]byte, 4096)
+	for written < n {
+		l := len(buf)
+		if d := n - written; d < int64(l) {
+			l = int(d)
+		}
+		nr, er := io.ReadAtLeast(src, buf[0:l], l)
+		if nr > 0 {
+			nw, ew := WriteToNetwork(dst, buf[0:nr])
+			if nw > 0 {
+				written += int64(nw)
+			}
+			if ew != nil {
+				err = ew
+				break
+			}
+			if nr != nw {
+				err = io.ErrShortWrite
+				break
+			}
+		}
+		if er != nil {
+			err = er
+			break
+		}
+	}
+	return
+}
+
+func FlushToNetwork(w *bufio.Writer) (err error) {
+	for {
+		err = w.Flush()
+		if err == nil {
+			return
+		}
+		netErr, ok := err.(net.Error)
+		if !ok {
+			return
+		}
+		if !netErr.Temporary() {
+			return
+		}
+		fmt.Println("FlushToNetwork !!!!!!!!!!!!!!!!!!")
+		time.Sleep(500 * time.Millisecond)
 	}
 	return
 }

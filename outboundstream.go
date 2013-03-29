@@ -8,6 +8,11 @@ import (
 	"github.com/zhangpeihao/goamf"
 )
 
+type OutboundStreamHandler interface {
+	OnPlayStart()
+	OnPublishStart()
+}
+
 // Message stream:
 //
 // A logical channel of communication that allows the flow of
@@ -16,6 +21,7 @@ type outboundStream struct {
 	id            uint32
 	conn          OutboundConn
 	chunkStreamID uint32
+	handler       OutboundStreamHandler
 }
 
 // A RTMP logical stream on connection.
@@ -32,7 +38,14 @@ type OutboundStream interface {
 	Close()
 	// Received messages
 	Received(message *Message) (handlered bool)
-	// Todo: Other commands
+	// Attach handler
+	Attach(handler OutboundStreamHandler)
+	// Publish audio data
+	PublishAudioData(data []byte, deltaTimestamp uint32) error
+	// Publish video data
+	PublishVideoData(data []byte, deltaTimestamp uint32) error
+	// Publish data
+	PublishData(dataType uint8, data []byte, deltaTimestamp uint32) error
 }
 
 // A publish stream
@@ -86,14 +99,37 @@ func (stream *outboundStream) SendVideoData(data []byte) error {
 // Seeks the kerframe closedst to the specified location.
 func (stream *outboundStream) Seek(offset uint32) {}
 
-func (stream *outboundStream) Publish(name, t string) (err error) {
-	return errors.New("Unimplemented")
+func (stream *outboundStream) Publish(streamName, howToPublish string) (err error) {
+	conn := stream.conn.Conn()
+	// Create publish command
+	cmd := &Command{
+		IsFlex:        true,
+		Name:          "publish",
+		TransactionID: 0,
+		Objects:       make([]interface{}, 3),
+	}
+	cmd.Objects[0] = nil
+	cmd.Objects[1] = streamName
+	if len(howToPublish) > 0 {
+		cmd.Objects[2] = howToPublish
+	} else {
+		cmd.Objects[2] = nil
+	}
+
+	// Construct message
+	message := NewMessage(stream.chunkStreamID, COMMAND_AMF3, stream.id, nil)
+	if err = cmd.Write(message.Buf); err != nil {
+		return
+	}
+	message.Dump("publish")
+
+	return conn.Send(message)
 }
 
 func (stream *outboundStream) Play(streamName string, start, duration *uint32, reset *bool) (err error) {
 	conn := stream.conn.Conn()
 
-	// Kend-die: in stream transaction ID always been 0
+	// Keng-die: in stream transaction ID always been 0
 	// Get transaction ID
 	// transactionID := conn.NewTransactionID()
 
@@ -127,7 +163,7 @@ func (stream *outboundStream) Play(streamName string, start, duration *uint32, r
 	}
 
 	// Construct message
-	message := NewMessage(stream.chunkStreamID, COMMAND_AMF3, GetTimestamp(), stream.id, nil)
+	message := NewMessage(stream.chunkStreamID, COMMAND_AMF3, stream.id, nil)
 	if err = cmd.Write(message.Buf); err != nil {
 		return
 	}
@@ -201,6 +237,14 @@ func (stream *outboundStream) onStatus(cmd *Command) bool {
 		fmt.Println("Play started")
 		// Set buffer size
 		stream.conn.Conn().SetStreamBufferSize(stream.id, 100)
+		if stream.handler != nil {
+			stream.handler.OnPlayStart()
+		}
+	case NETSTREAM_PUBLISH_START:
+		fmt.Println("Publish started")
+		if stream.handler != nil {
+			stream.handler.OnPublishStart()
+		}
 	}
 	return false
 }
@@ -211,4 +255,29 @@ func (stream *outboundStream) onMetaData(cmd *Command) bool {
 
 func (stream *outboundStream) onTimeCoordInfo(cmd *Command) bool {
 	return false
+}
+
+func (stream *outboundStream) Attach(handler OutboundStreamHandler) {
+	stream.handler = handler
+}
+
+// Publish audio data
+func (stream *outboundStream) PublishAudioData(data []byte, deltaTimestamp uint32) (err error) {
+	message := NewMessage(stream.chunkStreamID, AUDIO_TYPE, stream.id, data)
+	message.Timestamp = deltaTimestamp
+	return stream.conn.Send(message)
+}
+
+// Publish video data
+func (stream *outboundStream) PublishVideoData(data []byte, deltaTimestamp uint32) (err error) {
+	message := NewMessage(stream.chunkStreamID, VIDEO_TYPE, stream.id, data)
+	message.Timestamp = deltaTimestamp
+	return stream.conn.Send(message)
+}
+
+// Publish data
+func (stream *outboundStream) PublishData(dataType uint8, data []byte, deltaTimestamp uint32) (err error) {
+	message := NewMessage(stream.chunkStreamID, dataType, stream.id, data)
+	message.Timestamp = deltaTimestamp
+	return stream.conn.Send(message)
 }

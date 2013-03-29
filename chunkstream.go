@@ -47,23 +47,28 @@ func (chunkStream *OutboundChunkStream) NewOutboundHeader(message *Message) *Hea
 		MessageTypeID:   message.Type,
 		MessageStreamID: message.StreamID,
 	}
-	timestamp := chunkStream.GetTimestamp()
-	deltaTimestamp := timestamp - chunkStream.startAt
+	timestamp := chunkStream.lastAbsoluteTimestamp + message.Timestamp
+	deltaTimestamp := message.Timestamp
+	if message.StreamID == 0 {
+		timestamp = chunkStream.GetTimestamp()
+		deltaTimestamp = timestamp - chunkStream.lastAbsoluteTimestamp
+	}
 	if chunkStream.lastHeader == nil {
 		header.Fmt = HEADER_FMT_FULL
 		if chunkStream.ID == CS_ID_PROTOCOL_CONTROL {
+			// Fix timestamp
 			timestamp = 0
+			deltaTimestamp = 0
 			header.Timestamp = 0
 		} else {
 			header.Timestamp = timestamp
 		}
 	} else {
 		if chunkStream.ID == CS_ID_PROTOCOL_CONTROL {
-			if chunkStream.lastAbsoluteTimestamp != 0 {
-				// Freeze timestamp
-				timestamp = chunkStream.lastAbsoluteTimestamp
-				deltaTimestamp = 0
-			}
+			// Fix timestamp
+			timestamp = 0
+			deltaTimestamp = 0
+			header.Timestamp = 0
 		}
 
 		if header.MessageStreamID == chunkStream.lastHeader.MessageStreamID {
@@ -84,7 +89,6 @@ func (chunkStream *OutboundChunkStream) NewOutboundHeader(message *Message) *Hea
 						header.Fmt = HEADER_FMT_SAME_LENGTH_AND_STREAM
 						header.Timestamp = deltaTimestamp
 					}
-					header.Fmt = HEADER_FMT_CONTINUATION
 				}
 			} else {
 				header.Fmt = HEADER_FMT_SAME_STREAM
