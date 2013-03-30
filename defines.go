@@ -389,6 +389,7 @@ func GetTimestamp() uint32 {
 
 // Read byte from network
 func ReadByteFromNetwork(r Reader) (b byte, err error) {
+	retry := 1
 	for {
 		b, err = r.ReadByte()
 		if err == nil {
@@ -402,13 +403,17 @@ func ReadByteFromNetwork(r Reader) (b byte, err error) {
 			return
 		}
 		fmt.Println("ReadByteFromNetwork !!!!!!!!!!!!!!!!!!")
-		time.Sleep(500 * time.Millisecond)
+		if retry < 16 {
+			retry = retry * 2
+		}
+		time.Sleep(time.Duration(retry*500) * time.Millisecond)
 	}
 	return
 }
 
 // Read bytes from network
 func ReadAtLeastFromNetwork(r Reader, buf []byte, min int) (n int, err error) {
+	retry := 1
 	for {
 		n, err = io.ReadAtLeast(r, buf, min)
 		if err == nil {
@@ -422,7 +427,10 @@ func ReadAtLeastFromNetwork(r Reader, buf []byte, min int) (n int, err error) {
 			return
 		}
 		fmt.Println("ReadAtLeastFromNetwork !!!!!!!!!!!!!!!!!!")
-		time.Sleep(500 * time.Millisecond)
+		if retry < 16 {
+			retry = retry * 2
+		}
+		time.Sleep(time.Duration(retry*500) * time.Millisecond)
 	}
 	return
 }
@@ -463,6 +471,7 @@ func CopyNFromNetwork(dst Writer, src Reader, n int64) (written int64, err error
 func WriteToNetwork(w Writer, data []byte) (written int, err error) {
 	length := len(data)
 	var n int
+	retry := 1
 	for written < length {
 		n, err = w.Write(data[written:])
 		if err == nil {
@@ -477,7 +486,10 @@ func WriteToNetwork(w Writer, data []byte) (written int, err error) {
 			return
 		}
 		fmt.Println("WriteToNetwork !!!!!!!!!!!!!!!!!!")
-		time.Sleep(500 * time.Millisecond)
+		if retry < 16 {
+			retry = retry * 2
+		}
+		time.Sleep(time.Duration(retry*500) * time.Millisecond)
 	}
 	return
 
@@ -517,6 +529,7 @@ func CopyNToNetwork(dst Writer, src Reader, n int64) (written int64, err error) 
 }
 
 func FlushToNetwork(w *bufio.Writer) (err error) {
+	retry := 1
 	for {
 		err = w.Flush()
 		if err == nil {
@@ -530,7 +543,10 @@ func FlushToNetwork(w *bufio.Writer) (err error) {
 			return
 		}
 		fmt.Println("FlushToNetwork !!!!!!!!!!!!!!!!!!")
-		time.Sleep(500 * time.Millisecond)
+		if retry < 16 {
+			retry = retry * 2
+		}
+		time.Sleep(time.Duration(retry*500) * time.Millisecond)
 	}
 	return
 }

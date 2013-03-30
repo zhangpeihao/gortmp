@@ -80,6 +80,11 @@ func Dial(url string, handler OutboundConnHandler, maxChannelNumber int) (Outbou
 		return nil, err
 	}
 
+	ipConn, ok := c.(*net.TCPConn)
+	if ok {
+		fmt.Println("!!!!!!!!!!!!!!!!!!!!!!Set send buffer!!!!!!!!!!!!!!!!!")
+		ipConn.SetWriteBuffer(128 * 1024)
+	}
 	br := bufio.NewReader(c)
 	bw := bufio.NewWriter(c)
 	timeout := time.Duration(10) * time.Second

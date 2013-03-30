@@ -66,8 +66,9 @@ type conn struct {
 	lowPriorityMessageOffset int
 
 	// Chunk size
-	inChunkSize  uint32
-	outChunkSize uint32
+	inChunkSize      uint32
+	outChunkSize     uint32
+	outChunkSizeTemp uint32
 
 	// Bytes counter(For window ack)
 	inBytes  uint32
@@ -143,8 +144,7 @@ func NewConn(c net.Conn, br *bufio.Reader, bw *bufio.Writer, handler ConnHandler
 
 // Send high priority message in continuous chunks
 func (conn *conn) sendMessage(message *Message) {
-	fmt.Print(">>> ")
-	message.Dump("")
+	//	message.Dump(">>>")
 	chunkStream, found := conn.outChunkStreams[message.ChunkStreamID]
 	if !found {
 		fmt.Printf("Can not found chunk strem id %d", message.ChunkStreamID)
@@ -153,7 +153,6 @@ func (conn *conn) sendMessage(message *Message) {
 	}
 
 	header := chunkStream.NewOutboundHeader(message)
-	header.Dump("")
 	_, err := header.Write(conn.bw)
 	if err != nil {
 		conn.error(err, "sendMessage write header")
@@ -203,6 +202,11 @@ func (conn *conn) sendMessage(message *Message) {
 	err = FlushToNetwork(conn.bw)
 	if err != nil {
 		conn.error(err, "sendMessage Flush 3")
+	}
+	if conn.outChunkSizeTemp != 0 {
+		// Set chunk size
+		conn.outChunkSize = conn.outChunkSizeTemp
+		conn.outChunkSizeTemp = 0
 	}
 }
 
@@ -653,7 +657,7 @@ func (conn *conn) invokeAbortMessage(message *Message) {
 }
 
 func (conn *conn) invokeAcknowledgement(message *Message) {
-	fmt.Printf("conn::invokeAcknowledgement()")
+	fmt.Printf("conn::invokeAcknowledgement(): % 2x\n", message.Buf.Bytes())
 }
 
 // User Control Message
@@ -847,5 +851,15 @@ func (conn *conn) SetStreamBufferSize(streamId uint32, size uint32) {
 		fmt.Println("SetStreamBufferSize write size err:", err)
 		return
 	}
+	conn.Send(message)
+}
+
+func (conn *conn) SetChunkSize(size uint32) {
+	message := NewMessage(CS_ID_PROTOCOL_CONTROL, SET_CHUNK_SIZE, 0, nil)
+	if err := binary.Write(message.Buf, binary.BigEndian, &size); err != nil {
+		fmt.Println("SetChunkSize write event type err:", err)
+		return
+	}
+	conn.outChunkSizeTemp = size
 	conn.Send(message)
 }

@@ -336,7 +336,8 @@ func (header *Header) Write(wbuf Writer) (n int, err error) {
 
 	// Type 3 chunks MUST NOT have Extended timestamp????
 	// Todo: Test with FMS
-	if header.Timestamp >= 0xffffff && header.Fmt != HEADER_FMT_CONTINUATION {
+	// if header.Timestamp >= 0xffffff && header.Fmt != HEADER_FMT_CONTINUATION {
+	if header.Timestamp >= 0xffffff {
 		// Extended Timestamp
 		err = binary.Write(wbuf, binary.BigEndian, &(header.ExtendedTimestamp))
 		if err != nil {

@@ -9,8 +9,8 @@ import (
 )
 
 type OutboundStreamHandler interface {
-	OnPlayStart()
-	OnPublishStart()
+	OnPlayStart(stream OutboundStream)
+	OnPublishStart(stream OutboundStream)
 }
 
 // Message stream:
@@ -238,12 +238,12 @@ func (stream *outboundStream) onStatus(cmd *Command) bool {
 		// Set buffer size
 		stream.conn.Conn().SetStreamBufferSize(stream.id, 100)
 		if stream.handler != nil {
-			stream.handler.OnPlayStart()
+			stream.handler.OnPlayStart(stream)
 		}
 	case NETSTREAM_PUBLISH_START:
 		fmt.Println("Publish started")
 		if stream.handler != nil {
-			stream.handler.OnPublishStart()
+			stream.handler.OnPublishStart(stream)
 		}
 	}
 	return false

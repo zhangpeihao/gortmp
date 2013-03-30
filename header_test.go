@@ -167,7 +167,7 @@ var testHeaderCases = []TestHeaderCase{
 	},
 	{
 		"Type 3",
-		[]byte{},
+		[]byte{0x21, 0x00, 0x00, 0x00}, // Todo: Test with FMS
 		[]byte{0xc3},
 		Header{
 			Fmt:               0x03,
