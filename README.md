@@ -10,4 +10,35 @@ Spec:
 
 
 Todo:
-  Inbound side
+* Inbound side
+
+Examples:
+
+'''
+// To connect FMS server
+obConn, err := rtmp.Dial(url, handler, 100)
+
+// To connect
+err = obConn.Connect()
+
+// When new stream created, handler event OnStreamCreated() would been called
+func (handler *TestOutboundConnHandler) OnStreamCreated(stream rtmp.OutboundStream) {
+	// To play
+	err = stream.Play(*streamName, nil, nil, nil)
+	// Or publish
+	err = stream.Publish(*streamName, "live")
+}
+
+// To publish data
+stream.PublishAudioData(data, deltaTimestamp)
+// or
+stream.PublishVideoData(data, deltaTimestamp)
+// or
+stream.PublishData(tagHeader.TagType, data, deltaTimestamp)
+
+// You can close stream by
+stream.Close()
+
+// You can close connection by
+obConn.Close()
+'''

@@ -32,7 +32,7 @@ type OutboundConnHandler interface {
 
 type OutboundConn interface {
 	// Connect an appliction on FMS after handshake.
-	Connect(customParameters ...interface{}) (err error)
+	Connect(extendedParameters ...interface{}) (err error)
 	// Create a stream
 	CreateStream() (err error)
 	// Close a connection
@@ -109,7 +109,7 @@ func Dial(url string, handler OutboundConnHandler, maxChannelNumber int) (Outbou
 }
 
 // Connect an appliction on FMS after handshake.
-func (obConn *outboundConn) Connect(customParameters ...interface{}) (err error) {
+func (obConn *outboundConn) Connect(extendedParameters ...interface{}) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = r.(error)
@@ -188,10 +188,10 @@ func (obConn *outboundConn) Connect(customParameters ...interface{}) (err error)
 	_, err = amf.WriteObjectEndMarker(buf)
 	CheckError(err, "Connect() Write ObjectEndMarker")
 
-	// custom parameters
-	for _, param := range customParameters {
+	// extended parameters
+	for _, param := range extendedParameters {
 		_, err = amf.WriteValue(buf, param)
-		CheckError(err, "Connect() Write custome parameters")
+		CheckError(err, "Connect() Write extended parameters")
 	}
 
 	connectMessage := Message{
@@ -207,6 +207,10 @@ func (obConn *outboundConn) Connect(customParameters ...interface{}) (err error)
 
 // Close a connection
 func (obConn *outboundConn) Close() {
+	for _, stream := range obConn.streams {
+		stream.Close()
+	}
+	time.Sleep(time.Second)
 	obConn.status = OUTBOUND_CONN_STATUS_CLOSE
 	obConn.conn.Close()
 }

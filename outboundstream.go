@@ -83,7 +83,21 @@ func (stream *outboundStream) Resume() error {
 
 // Close
 func (stream *outboundStream) Close() {
-	// Todo: Callback to remove stream.
+	var err error
+	cmd := &Command{
+		IsFlex:        true,
+		Name:          "closeStream",
+		TransactionID: 0,
+		Objects:       make([]interface{}, 1),
+	}
+	cmd.Objects[0] = nil
+	message := NewMessage(stream.chunkStreamID, COMMAND_AMF3, stream.id, nil)
+	if err = cmd.Write(message.Buf); err != nil {
+		return
+	}
+	message.Dump("closeStream")
+	conn := stream.conn.Conn()
+	conn.Send(message)
 }
 
 // Send audio data

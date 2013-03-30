@@ -414,6 +414,7 @@ func (conn *conn) error(err error, desc string) {
 
 func (conn *conn) Close() {
 	//	panic(errors.New("Closed"))
+
 	conn.closed = true
 	conn.c.Close()
 }
@@ -830,10 +831,6 @@ func (conn *conn) invokeSetPeerBandwidth(message *Message) {
 
 func (conn *conn) invokeCommand(cmd *Command) {
 	conn.handler.ReceivedCommand(cmd)
-}
-
-func (conn *conn) OutboundStreamHandler(stream *OutboundStream) {
-
 }
 
 func (conn *conn) SetStreamBufferSize(streamId uint32, size uint32) {
