@@ -14,7 +14,7 @@ Todo:
 
 Examples:
 
-'''
+```
 // To connect FMS server
 obConn, err := rtmp.Dial(url, handler, 100)
 
@@ -41,4 +41,4 @@ stream.Close()
 
 // You can close connection by
 obConn.Close()
-'''
+```
