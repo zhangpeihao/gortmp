@@ -120,6 +120,9 @@ func Handshake(c net.Conn, br *bufio.Reader, bw *bufio.Writer, timeout time.Dura
 	c1 := CreateRandomBlock(RTMP_SIG_SIZE)
 	// Set Timestamp
 	binary.BigEndian.PutUint32(c1, uint32(GetTimestamp()))
+	//	for i := 0; i < 4; i++ {
+	//		c1[i] = 0
+	//	}
 	// Set FlashPlayer version
 	for i := 0; i < 4; i++ {
 		c1[4+i] = FLASH_PLAYER_VERSION[i]
@@ -130,9 +133,9 @@ func Handshake(c net.Conn, br *bufio.Reader, bw *bufio.Writer, timeout time.Dura
 	// Create temp buffer
 	tmpBuf := new(bytes.Buffer)
 	tmpBuf.Write(c1[:clientDigestOffset])
-	tmpBuf.Write(c1[clientDigestOffset+32:])
+	tmpBuf.Write(c1[clientDigestOffset+SHA256_DIGEST_LENGTH:])
 	// Generate the hash
-	tempHash, err := HMACsha256(tmpBuf.Bytes(), GENUINE_FP_KEY)
+	tempHash, err := HMACsha256(tmpBuf.Bytes(), GENUINE_FP_KEY[:30])
 	CheckError(err, "Handshake() Generate the C1 hash")
 	for index, b := range tempHash {
 		c1[clientDigestOffset+uint32(index)] = b
@@ -165,8 +168,8 @@ func Handshake(c net.Conn, br *bufio.Reader, bw *bufio.Writer, timeout time.Dura
 	CheckError(err, "Handshake Read S1")
 
 	// Generate C2
-	digestPosClient := GetDigestOffset1(s1)
-	digestResp, err := HMACsha256(s1[digestPosClient:digestPosClient+SHA256_DIGEST_LENGTH], GENUINE_FP_KEY)
+	digestPosServer := GetDigestOffset1(s1)
+	digestResp, err := HMACsha256(s1[digestPosServer:digestPosServer+SHA256_DIGEST_LENGTH], GENUINE_FP_KEY)
 	CheckError(err, "Generate C2 HMACsha256 Offset1")
 	c2 := CreateRandomBlock(RTMP_SIG_SIZE)
 	signatureResp, err := HMACsha256(c2[:RTMP_SIG_SIZE-SHA256_DIGEST_LENGTH], digestResp)

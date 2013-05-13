@@ -249,10 +249,12 @@ const (
 )
 
 var (
-	FLASH_PLAYER_VERSION        = []byte{128, 0, 7, 2}
-	FLASH_PLAYER_VERSION_STRING = "WIN 11,4,31,110"
+	//	FLASH_PLAYER_VERSION        = []byte{0x09, 0x00, 0x7C, 0x02}
+	FLASH_PLAYER_VERSION        = []byte{0x80, 0x00, 0x07, 0x02}
+	FLASH_PLAYER_VERSION_STRING = "LNX 9,0,124,2"
 	SWF_URL_STRING              = "http://localhost/1.swf"
 	PAGE_URL_STRING             = "http://localhost/1.html"
+	MIN_BUFFER_LENGTH           = uint32(500)
 )
 
 const (
@@ -262,8 +264,8 @@ const (
 	DEFAULT_LOW_PRIORITY_BUFFER_SIZE    = 64
 	DEFAULT_CHUNK_SIZE                  = uint32(128)
 	DEFAULT_WINDOW_SIZE                 = 2500000
-	DEFAULT_CAPABILITIES                = float64(239)
-	DEFAULT_AUDIO_CODECS                = float64(3575)
+	DEFAULT_CAPABILITIES                = float64(15)
+	DEFAULT_AUDIO_CODECS                = float64(4071)
 	DEFAULT_VIDEO_CODECS                = float64(252)
 )
 

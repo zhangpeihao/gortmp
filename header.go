@@ -227,8 +227,8 @@ func (header *Header) ReadHeader(rbuf Reader, vfmt uint8, csi uint32) (n int, er
 		}
 		n += 4
 		header.ExtendedTimestamp = binary.BigEndian.Uint32(tmpBuf)
-		fmt.Printf("Extened timestamp: %d, timestamp: %d\n", header.ExtendedTimestamp, header.Timestamp)
-		header.Dump("Extended timestamp")
+		//		fmt.Printf("Extened timestamp: %d, timestamp: %d\n", header.ExtendedTimestamp, header.Timestamp)
+		//		header.Dump("Extended timestamp")
 	} else {
 		header.ExtendedTimestamp = 0
 	}

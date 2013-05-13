@@ -3,6 +3,7 @@
 package rtmp
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/zhangpeihao/goamf"
@@ -22,6 +23,7 @@ type outboundStream struct {
 	conn          OutboundConn
 	chunkStreamID uint32
 	handler       OutboundStreamHandler
+	bufferLength  uint32
 }
 
 // A RTMP logical stream on connection.
@@ -145,13 +147,13 @@ func (stream *outboundStream) Play(streamName string, start, duration *uint32, r
 
 	// Keng-die: in stream transaction ID always been 0
 	// Get transaction ID
-	// transactionID := conn.NewTransactionID()
+	transactionID := conn.NewTransactionID()
 
 	// Create play command
 	cmd := &Command{
-		IsFlex:        true,
+		IsFlex:        false,
 		Name:          "play",
-		TransactionID: 0,
+		TransactionID: transactionID,
 		Objects:       make([]interface{}, 2),
 	}
 	cmd.Objects[0] = nil
@@ -177,13 +179,38 @@ func (stream *outboundStream) Play(streamName string, start, duration *uint32, r
 	}
 
 	// Construct message
-	message := NewMessage(stream.chunkStreamID, COMMAND_AMF3, stream.id, nil)
+	message := NewMessage(stream.chunkStreamID, COMMAND_AMF0, stream.id, nil)
 	if err = cmd.Write(message.Buf); err != nil {
 		return
 	}
 	message.Dump("play")
 
-	return conn.Send(message)
+	err = conn.Send(message)
+	if err != nil {
+		return
+	}
+
+	// Set Buffer Length
+	setBufferLengthMessage := NewMessage(CS_ID_PROTOCOL_CONTROL, USER_CONTROL_MESSAGE, 0, nil)
+	respEventType := uint16(EVENT_SET_BUFFER_LENGTH)
+	if err = binary.Write(setBufferLengthMessage.Buf, binary.BigEndian, &respEventType); err != nil {
+		return
+	}
+
+	// Stream ID
+	if err = binary.Write(setBufferLengthMessage.Buf, binary.BigEndian, &stream.id); err != nil {
+		return
+	}
+
+	// Buffer length
+	if stream.bufferLength < MIN_BUFFER_LENGTH {
+		stream.bufferLength = MIN_BUFFER_LENGTH
+	}
+	if err = binary.Write(setBufferLengthMessage.Buf, binary.BigEndian, &stream.bufferLength); err != nil {
+		return
+	}
+	return conn.Send(setBufferLengthMessage)
+
 }
 
 func (stream *outboundStream) Received(message *Message) bool {

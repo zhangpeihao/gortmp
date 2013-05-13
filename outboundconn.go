@@ -82,7 +82,6 @@ func Dial(url string, handler OutboundConnHandler, maxChannelNumber int) (Outbou
 
 	ipConn, ok := c.(*net.TCPConn)
 	if ok {
-		fmt.Println("!!!!!!!!!!!!!!!!!!!!!!Set send buffer!!!!!!!!!!!!!!!!!")
 		ipConn.SetWriteBuffer(128 * 1024)
 	}
 	br := bufio.NewReader(c)
@@ -140,10 +139,10 @@ func (obConn *outboundConn) Connect(extendedParameters ...interface{}) (err erro
 	_, err = amf.WriteString(buf, FLASH_PLAYER_VERSION_STRING)
 	CheckError(err, "Connect() Write flashver value")
 
-	_, err = amf.WriteObjectName(buf, "swfUrl")
-	CheckError(err, "Connect() Write swfUrl name")
-	_, err = amf.WriteString(buf, SWF_URL_STRING)
-	CheckError(err, "Connect() Write swfUrl value")
+	//	_, err = amf.WriteObjectName(buf, "swfUrl")
+	//	CheckError(err, "Connect() Write swfUrl name")
+	//	_, err = amf.WriteString(buf, SWF_URL_STRING)
+	//	CheckError(err, "Connect() Write swfUrl value")
 
 	_, err = amf.WriteObjectName(buf, "tcUrl")
 	CheckError(err, "Connect() Write tcUrl name")
@@ -175,15 +174,15 @@ func (obConn *outboundConn) Connect(extendedParameters ...interface{}) (err erro
 	_, err = amf.WriteDouble(buf, float64(1))
 	CheckError(err, "Connect() Write vedioFunction value")
 
-	_, err = amf.WriteObjectName(buf, "pageUrl")
-	CheckError(err, "Connect() Write pageUrl name")
-	_, err = amf.WriteString(buf, PAGE_URL_STRING)
-	CheckError(err, "Connect() Write pageUrl value")
+	//	_, err = amf.WriteObjectName(buf, "pageUrl")
+	//	CheckError(err, "Connect() Write pageUrl name")
+	//	_, err = amf.WriteString(buf, PAGE_URL_STRING)
+	//	CheckError(err, "Connect() Write pageUrl value")
 
-	_, err = amf.WriteObjectName(buf, "objectEncoding")
-	CheckError(err, "Connect() Write objectEncoding name")
-	_, err = amf.WriteDouble(buf, float64(amf.AMF3))
-	CheckError(err, "Connect() Write objectEncoding value")
+	//	_, err = amf.WriteObjectName(buf, "objectEncoding")
+	//	CheckError(err, "Connect() Write objectEncoding name")
+	//	_, err = amf.WriteDouble(buf, float64(amf.AMF3))
+	//	CheckError(err, "Connect() Write objectEncoding value")
 
 	_, err = amf.WriteObjectEndMarker(buf)
 	CheckError(err, "Connect() Write ObjectEndMarker")
@@ -288,6 +287,7 @@ func (obConn *outboundConn) ReceivedCommand(command *Command) {
 		} else {
 			fmt.Printf("Command(%d) not been found\n", command.TransactionID)
 		}
+	case "onBWCheck":
 	}
 }
 
@@ -304,7 +304,7 @@ func (obConn *outboundConn) CreateStream() (err error) {
 	// Create createStream command
 	transactionID := obConn.conn.NewTransactionID()
 	cmd := &Command{
-		IsFlex:        true,
+		IsFlex:        false,
 		Name:          "createStream",
 		TransactionID: transactionID,
 		Objects:       make([]interface{}, 1),
@@ -317,7 +317,7 @@ func (obConn *outboundConn) CreateStream() (err error) {
 
 	message := Message{
 		ChunkStreamID: CS_ID_COMMAND,
-		Type:          COMMAND_AMF3,
+		Type:          COMMAND_AMF0,
 		Size:          uint32(buf.Len()),
 		Buf:           buf,
 	}

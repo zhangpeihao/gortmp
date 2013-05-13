@@ -176,20 +176,20 @@ func (conn *conn) sendMessage(message *Message) {
 				if err != nil {
 					conn.error(err, "sendMessage copy split buffer 1")
 				}
-				err = FlushToNetwork(conn.bw)
-				if err != nil {
-					conn.error(err, "sendMessage Flush 1")
-				}
+				//				err = FlushToNetwork(conn.bw)
+				//				if err != nil {
+				//					conn.error(err, "sendMessage Flush 1")
+				//				}
 				remain -= conn.outChunkSize
 			} else {
 				_, err = CopyNToNetwork(conn.bw, message.Buf, int64(remain))
 				if err != nil {
 					conn.error(err, "sendMessage copy split buffer 2")
 				}
-				err = FlushToNetwork(conn.bw)
-				if err != nil {
-					conn.error(err, "sendMessage Flush 2")
-				}
+				//				err = FlushToNetwork(conn.bw)
+				//				if err != nil {
+				//					conn.error(err, "sendMessage Flush 2")
+				//				}
 				break
 			}
 		}
