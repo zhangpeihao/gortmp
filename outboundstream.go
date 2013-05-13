@@ -145,6 +145,23 @@ func (stream *outboundStream) Publish(streamName, howToPublish string) (err erro
 func (stream *outboundStream) Play(streamName string, start, duration *uint32, reset *bool) (err error) {
 	conn := stream.conn.Conn()
 
+	// First send receiveVideo command
+	cmdT := &Command{
+		IsFlex:        false,
+		Name:          "receiveVideo",
+		TransactionID: 0,
+		Objects:       make([]interface{}, 1),
+	}
+	cmdT.Objects[0] = true
+	messageT := NewMessage(stream.chunkStreamID, COMMAND_AMF0, stream.id, nil)
+	if err = cmdT.Write(messageT.Buf); err != nil {
+		return
+	}
+	err = conn.Send(messageT)
+	if err != nil {
+		return
+	}
+
 	// Keng-die: in stream transaction ID always been 0
 	// Get transaction ID
 	transactionID := conn.NewTransactionID()

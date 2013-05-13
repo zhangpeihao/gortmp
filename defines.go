@@ -249,8 +249,10 @@ const (
 )
 
 var (
-	//	FLASH_PLAYER_VERSION        = []byte{0x09, 0x00, 0x7C, 0x02}
-	FLASH_PLAYER_VERSION        = []byte{0x80, 0x00, 0x07, 0x02}
+	//	FLASH_PLAYER_VERSION = []byte{0x0A, 0x00, 0x2D, 0x02}
+	FLASH_PLAYER_VERSION = []byte{0x09, 0x00, 0x7C, 0x02}
+	//FLASH_PLAYER_VERSION        = []byte{0x80, 0x00, 0x07, 0x02}
+	//FLASH_PLAYER_VERSION_STRING = "LNX 10,0,32,18"
 	FLASH_PLAYER_VERSION_STRING = "LNX 9,0,124,2"
 	SWF_URL_STRING              = "http://localhost/1.swf"
 	PAGE_URL_STRING             = "http://localhost/1.html"

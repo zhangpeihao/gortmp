@@ -249,14 +249,14 @@ func (conn *conn) sendLoop() {
 // read loop
 func (conn *conn) readLoop() {
 	defer func() {
-		/*
-			if r := recover(); r != nil {
-				if conn.err == nil {
-					conn.err = r.(error)
-					fmt.Println("readLoop panic:", conn.err)
-				}
+
+		if r := recover(); r != nil {
+			if conn.err == nil {
+				conn.err = r.(error)
+				fmt.Println("readLoop panic:", conn.err)
 			}
-		*/
+		}
+
 		conn.Close()
 	}()
 	var found bool

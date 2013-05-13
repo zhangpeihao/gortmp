@@ -86,7 +86,7 @@ func main() {
 	var err error
 	obConn, err = rtmp.Dial(*url, testHandler, 100)
 	if err != nil {
-		fmt.Println("Dial error")
+		fmt.Println("Dial error", err)
 		os.Exit(-1)
 	}
 	defer obConn.Close()

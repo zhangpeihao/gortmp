@@ -47,34 +47,6 @@ var (
 	}
 )
 
-func GetDigestOffset1(buf []byte) (offset uint32) {
-	offset = uint32(buf[8]) + uint32(buf[9]) + uint32(buf[10]) + uint32(buf[11])
-	offset = offset % 728
-	offset = offset + 12
-	return offset
-}
-
-func GetDigestOffset2(buf []byte) (offset uint32) {
-	offset = uint32(buf[772]) + uint32(buf[773]) + uint32(buf[774]) + uint32(buf[775])
-	offset = offset % 728
-	offset = offset + 776
-	return offset
-}
-
-func GetDHOffset1(buf []byte) (offset uint32) {
-	offset = uint32(buf[1532]) + uint32(buf[1533]) + uint32(buf[1534]) + uint32(buf[1535])
-	offset = offset % 632
-	offset = offset + 772
-	return offset
-}
-
-func GetDHOffset2(buf []byte) (offset uint32) {
-	offset = uint32(buf[768]) + uint32(buf[769]) + uint32(buf[770]) + uint32(buf[771])
-	offset = offset % 632
-	offset = offset + 8
-	return offset
-}
-
 func HMACsha256(msgBytes []byte, key []byte) ([]byte, error) {
 	h := hmac.New(sha256.New, key)
 	_, err := h.Write(msgBytes)
@@ -108,6 +80,53 @@ func CreateRandomBlock(size uint) []byte {
 
 }
 
+func CalcDigestPos(buf []byte, offset uint32, mod_val uint32, add_val uint32) (digest_pos uint32) {
+	var i uint32
+	for i = 0; i < 4; i++ {
+		digest_pos += uint32(buf[i+offset])
+	}
+	digest_pos = digest_pos%mod_val + add_val
+	return
+}
+
+func ValidateDigest(buf []byte, offset uint32) uint32 {
+	digestPos := CalcDigestPos(buf, offset, 728, offset+4)
+	fmt.Printf("digestPos: %d\n", digestPos)
+	// Create temp buffer
+	tmpBuf := new(bytes.Buffer)
+	tmpBuf.Write(buf[:digestPos])
+	tmpBuf.Write(buf[digestPos+SHA256_DIGEST_LENGTH:])
+	// Generate the hash
+	tempHash, err := HMACsha256(tmpBuf.Bytes(), GENUINE_FMS_KEY[:36])
+	if err != nil {
+		return 0
+	}
+	//fmt.Printf("tempHash: % 2x\n", tempHash)
+	//fmt.Printf("Got     : % 2x\n", buf[digestPos:digestPos+SHA256_DIGEST_LENGTH])
+	if bytes.Compare(tempHash, buf[digestPos:digestPos+SHA256_DIGEST_LENGTH]) == 0 {
+		return digestPos
+	}
+	return 0
+}
+
+func ImprintWithDigest(buf []byte) uint32 {
+	digestPos := CalcDigestPos(buf, 8, 728, 12)
+
+	// Create temp buffer
+	tmpBuf := new(bytes.Buffer)
+	tmpBuf.Write(buf[:digestPos])
+	tmpBuf.Write(buf[digestPos+SHA256_DIGEST_LENGTH:])
+	// Generate the hash
+	tempHash, err := HMACsha256(tmpBuf.Bytes(), GENUINE_FP_KEY[:30])
+	if err != nil {
+		return 0
+	}
+	for index, b := range tempHash {
+		buf[digestPos+uint32(index)] = b
+	}
+	return digestPos
+}
+
 func Handshake(c net.Conn, br *bufio.Reader, bw *bufio.Writer, timeout time.Duration) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -119,26 +138,20 @@ func Handshake(c net.Conn, br *bufio.Reader, bw *bufio.Writer, timeout time.Dura
 	CheckError(err, "Handshake() Send C0")
 	c1 := CreateRandomBlock(RTMP_SIG_SIZE)
 	// Set Timestamp
-	binary.BigEndian.PutUint32(c1, uint32(GetTimestamp()))
-	//	for i := 0; i < 4; i++ {
-	//		c1[i] = 0
-	//	}
+	// binary.BigEndian.PutUint32(c1, uint32(GetTimestamp()))
+	for i := 0; i < 4; i++ {
+		c1[i] = 0
+	}
 	// Set FlashPlayer version
 	for i := 0; i < 4; i++ {
 		c1[4+i] = FLASH_PLAYER_VERSION[i]
 	}
+
 	// TODO: Create the DH public/private key, and use it in encryption mode
-	// Get Digest offset
-	clientDigestOffset := GetDigestOffset1(c1)
-	// Create temp buffer
-	tmpBuf := new(bytes.Buffer)
-	tmpBuf.Write(c1[:clientDigestOffset])
-	tmpBuf.Write(c1[clientDigestOffset+SHA256_DIGEST_LENGTH:])
-	// Generate the hash
-	tempHash, err := HMACsha256(tmpBuf.Bytes(), GENUINE_FP_KEY[:30])
-	CheckError(err, "Handshake() Generate the C1 hash")
-	for index, b := range tempHash {
-		c1[clientDigestOffset+uint32(index)] = b
+
+	clientDigestOffset := ImprintWithDigest(c1)
+	if clientDigestOffset == 0 {
+		return errors.New("ImprintWithDigest failed")
 	}
 
 	_, err = bw.Write(c1)
@@ -166,14 +179,46 @@ func Handshake(c net.Conn, br *bufio.Reader, bw *bufio.Writer, timeout time.Dura
 	}
 	_, err = io.ReadAtLeast(br, s1, RTMP_SIG_SIZE)
 	CheckError(err, "Handshake Read S1")
+	//	if s1[4] < 3 {
+	//		return errors.New(fmt.Sprintf("FMS version is %d.%d.%d.%d, unsupported!", s1[4], s1[5], s1[6], s1[7]))
+	//	}
+
+	// Read S2
+	if timeout > 0 {
+		c.SetReadDeadline(time.Now().Add(timeout))
+	}
+	s2 := make([]byte, RTMP_SIG_SIZE)
+	_, err = io.ReadAtLeast(br, s2, RTMP_SIG_SIZE)
+	CheckError(err, "Handshake() Read S2")
+
+	// Check server response
+	server_pos := ValidateDigest(s1, 8)
+	if server_pos == 0 {
+		server_pos = ValidateDigest(s1, 772)
+		if server_pos == 0 {
+			return errors.New("Server response validating failed")
+		}
+	}
+
+	digest, err := HMACsha256(c1[clientDigestOffset:clientDigestOffset+SHA256_DIGEST_LENGTH], GENUINE_FMS_KEY)
+	CheckError(err, "Get digest from c1 error")
+
+	signature, err := HMACsha256(s2[:RTMP_SIG_SIZE-SHA256_DIGEST_LENGTH], digest)
+	CheckError(err, "Get signature from s2 error")
+
+	if bytes.Compare(signature, s2[RTMP_SIG_SIZE-SHA256_DIGEST_LENGTH:]) != 0 {
+		return errors.New("Server signature mismatch")
+	}
 
 	// Generate C2
-	digestPosServer := GetDigestOffset1(s1)
-	digestResp, err := HMACsha256(s1[digestPosServer:digestPosServer+SHA256_DIGEST_LENGTH], GENUINE_FP_KEY)
-	CheckError(err, "Generate C2 HMACsha256 Offset1")
+	// server_pos := GetDigestOffset1(s1)
+	digestResp, err := HMACsha256(s1[server_pos:server_pos+SHA256_DIGEST_LENGTH], GENUINE_FP_KEY)
+	CheckError(err, "Generate C2 HMACsha256 digestResp")
+
 	c2 := CreateRandomBlock(RTMP_SIG_SIZE)
+	fmt.Printf("len(digestResp) = %d\n", len(digestResp))
 	signatureResp, err := HMACsha256(c2[:RTMP_SIG_SIZE-SHA256_DIGEST_LENGTH], digestResp)
-	CheckError(err, "Generate C2 HMACsha256 C2")
+	CheckError(err, "Generate C2 HMACsha256 signatureResp")
 	//	DumpBuffer("signatureResp", signatureResp, 0)
 	for index, b := range signatureResp {
 		c2[RTMP_SIG_SIZE-SHA256_DIGEST_LENGTH+index] = b
@@ -188,12 +233,5 @@ func Handshake(c net.Conn, br *bufio.Reader, bw *bufio.Writer, timeout time.Dura
 	err = bw.Flush()
 	CheckError(err, "Handshake() Flush C2")
 
-	// Read S2
-	if timeout > 0 {
-		c.SetReadDeadline(time.Now().Add(timeout))
-	}
-	s2 := make([]byte, RTMP_SIG_SIZE)
-	_, err = io.ReadAtLeast(br, s2, RTMP_SIG_SIZE)
-	CheckError(err, "Handshake() Read S2")
 	return
 }
