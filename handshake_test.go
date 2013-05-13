@@ -14,9 +14,9 @@ const (
 func testC1(c1 []byte, offset1 bool) error {
 	var clientDigestOffset uint32
 	if offset1 {
-		clientDigestOffset = GetDigestOffset1(c1)
+		clientDigestOffset = CalcDigestPos(c1, 8, 728, 12)
 	} else {
-		clientDigestOffset = GetDigestOffset2(c1)
+		clientDigestOffset = CalcDigestPos(c1, 772, 728, 776)
 	}
 	// Create temp buffer
 	tmpBuf := new(bytes.Buffer)
@@ -57,8 +57,7 @@ func TestHandshake(t *testing.T) {
 			}
 		}
 
-		digestPosServer := GetDigestOffset1(s1)
-		fmt.Printf("S1 postion: %d\n", digestPosServer)
+		digestPosServer := CalcDigestPos(s1, 8, 728, 12)
 		digestResp, err := HMACsha256(s1[digestPosServer:digestPosServer+SHA256_DIGEST_LENGTH], GENUINE_FP_KEY)
 		if err != nil {
 			t.Fatalf("Generate C2 HMACsha256 Offset1 err: %s\n", err.Error())
@@ -67,7 +66,6 @@ func TestHandshake(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Generate C2 HMACsha256 C2 err: %s\n", err.Error())
 		}
-		fmt.Printf("signatureResp: % 2x\n", signatureResp)
 		expect := c2[RTMP_SIG_SIZE-SHA256_DIGEST_LENGTH:]
 		if bytes.Compare(expect, signatureResp) != 0 {
 			t.Fatalf("C2\nExpect % 2x\nGot    % 2x\n",
