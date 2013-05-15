@@ -256,7 +256,7 @@ var (
 	FLASH_PLAYER_VERSION_STRING = "LNX 9,0,124,2"
 	SWF_URL_STRING              = "http://localhost/1.swf"
 	PAGE_URL_STRING             = "http://localhost/1.html"
-	MIN_BUFFER_LENGTH           = uint32(500)
+	MIN_BUFFER_LENGTH           = uint32(256)
 )
 
 const (
@@ -388,7 +388,8 @@ func DumpBuffer(name string, data []byte, ind int) {
 
 // Get timestamp
 func GetTimestamp() uint32 {
-	return uint32((time.Now().UnixNano() / int64(1000000)) % MAX_TIMESTAMP)
+	return uint32(0)
+	//	return uint32((time.Now().UnixNano() / int64(1000000)) % MAX_TIMESTAMP)
 }
 
 // Read byte from network

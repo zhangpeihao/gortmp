@@ -3,7 +3,7 @@
 package rtmp
 
 import (
-	"encoding/binary"
+	//	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/zhangpeihao/goamf"
@@ -144,24 +144,24 @@ func (stream *outboundStream) Publish(streamName, howToPublish string) (err erro
 
 func (stream *outboundStream) Play(streamName string, start, duration *uint32, reset *bool) (err error) {
 	conn := stream.conn.Conn()
-
-	// First send receiveVideo command
-	cmdT := &Command{
-		IsFlex:        false,
-		Name:          "receiveVideo",
-		TransactionID: 0,
-		Objects:       make([]interface{}, 1),
-	}
-	cmdT.Objects[0] = true
-	messageT := NewMessage(stream.chunkStreamID, COMMAND_AMF0, stream.id, nil)
-	if err = cmdT.Write(messageT.Buf); err != nil {
-		return
-	}
-	err = conn.Send(messageT)
-	if err != nil {
-		return
-	}
-
+	/*
+		// First send receiveVideo command
+		cmdT := &Command{
+			IsFlex:        false,
+			Name:          "receiveVideo",
+			TransactionID: 0,
+			Objects:       make([]interface{}, 1),
+		}
+		cmdT.Objects[0] = true
+		messageT := NewMessage(stream.chunkStreamID, COMMAND_AMF0, stream.id, nil)
+		if err = cmdT.Write(messageT.Buf); err != nil {
+			return
+		}
+		err = conn.Send(messageT)
+		if err != nil {
+			return
+		}
+	*/
 	// Keng-die: in stream transaction ID always been 0
 	// Get transaction ID
 	transactionID := conn.NewTransactionID()
@@ -208,26 +208,29 @@ func (stream *outboundStream) Play(streamName string, start, duration *uint32, r
 	}
 
 	// Set Buffer Length
-	setBufferLengthMessage := NewMessage(CS_ID_PROTOCOL_CONTROL, USER_CONTROL_MESSAGE, 0, nil)
-	respEventType := uint16(EVENT_SET_BUFFER_LENGTH)
-	if err = binary.Write(setBufferLengthMessage.Buf, binary.BigEndian, &respEventType); err != nil {
-		return
-	}
-
-	// Stream ID
-	if err = binary.Write(setBufferLengthMessage.Buf, binary.BigEndian, &stream.id); err != nil {
-		return
-	}
-
 	// Buffer length
 	if stream.bufferLength < MIN_BUFFER_LENGTH {
 		stream.bufferLength = MIN_BUFFER_LENGTH
 	}
-	if err = binary.Write(setBufferLengthMessage.Buf, binary.BigEndian, &stream.bufferLength); err != nil {
-		return
-	}
-	return conn.Send(setBufferLengthMessage)
+	stream.conn.Conn().SetStreamBufferSize(stream.id, stream.bufferLength)
+	/*
+		setBufferLengthMessage := NewMessage(CS_ID_PROTOCOL_CONTROL, USER_CONTROL_MESSAGE, 0, nil)
+		respEventType := uint16(EVENT_SET_BUFFER_LENGTH)
+		if err = binary.Write(setBufferLengthMessage.Buf, binary.BigEndian, &respEventType); err != nil {
+			return
+		}
 
+		// Stream ID
+		if err = binary.Write(setBufferLengthMessage.Buf, binary.BigEndian, &stream.id); err != nil {
+			return
+		}
+
+		if err = binary.Write(setBufferLengthMessage.Buf, binary.BigEndian, &stream.bufferLength); err != nil {
+			return
+		}
+		return conn.Send(setBufferLengthMessage)
+	*/
+	return nil
 }
 
 func (stream *outboundStream) Received(message *Message) bool {
@@ -294,7 +297,7 @@ func (stream *outboundStream) onStatus(cmd *Command) bool {
 	case NETSTREAM_PLAY_START:
 		fmt.Println("Play started")
 		// Set buffer size
-		stream.conn.Conn().SetStreamBufferSize(stream.id, 100)
+		//stream.conn.Conn().SetStreamBufferSize(stream.id, 1500)
 		if stream.handler != nil {
 			stream.handler.OnPlayStart(stream)
 		}

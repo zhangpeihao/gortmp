@@ -218,8 +218,8 @@ func Handshake(c net.Conn, br *bufio.Reader, bw *bufio.Writer, timeout time.Dura
 	c2 := CreateRandomBlock(RTMP_SIG_SIZE)
 	fmt.Printf("len(digestResp) = %d\n", len(digestResp))
 	signatureResp, err := HMACsha256(c2[:RTMP_SIG_SIZE-SHA256_DIGEST_LENGTH], digestResp)
-	CheckError(err, "Generate C2 HMACsha256 signatureResp")
-	//	DumpBuffer("signatureResp", signatureResp, 0)
+	//CheckError(err, "Generate C2 HMACsha256 signatureResp")
+	DumpBuffer("signatureResp", signatureResp, 0)
 	for index, b := range signatureResp {
 		c2[RTMP_SIG_SIZE-SHA256_DIGEST_LENGTH+index] = b
 	}
