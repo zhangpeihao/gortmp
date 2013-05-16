@@ -10,8 +10,9 @@ package rtmp
 type OutboundChunkStream struct {
 	ID uint32
 
-	lastHeader            *Header
-	lastAbsoluteTimestamp uint32
+	lastHeader               *Header
+	lastOutAbsoluteTimestamp uint32
+	lastInAbsoluteTimestamp  uint32
 
 	// Start at timestamp
 	startAt uint32
@@ -20,8 +21,9 @@ type OutboundChunkStream struct {
 type InboundChunkStream struct {
 	ID uint32
 
-	lastHeader            *Header
-	lastAbsoluteTimestamp uint32
+	lastHeader               *Header
+	lastOutAbsoluteTimestamp uint32
+	lastInAbsoluteTimestamp  uint32
 
 	// The unfinished incoming message
 	receivedMessage *Message
@@ -29,8 +31,7 @@ type InboundChunkStream struct {
 
 func NewOutboundChunkStream(id uint32) *OutboundChunkStream {
 	return &OutboundChunkStream{
-		ID:      id,
-		startAt: GetTimestamp(),
+		ID: id,
 	}
 }
 
@@ -47,29 +48,37 @@ func (chunkStream *OutboundChunkStream) NewOutboundHeader(message *Message) *Hea
 		MessageTypeID:   message.Type,
 		MessageStreamID: message.StreamID,
 	}
-	timestamp := chunkStream.lastAbsoluteTimestamp + message.Timestamp
-	deltaTimestamp := message.Timestamp
-	if message.StreamID == 0 {
+	timestamp := message.Timestamp
+	if timestamp == uint32(0) {
 		timestamp = chunkStream.GetTimestamp()
-		deltaTimestamp = timestamp - chunkStream.lastAbsoluteTimestamp
 	}
+	deltaTimestamp := uint32(0)
+	if chunkStream.lastOutAbsoluteTimestamp < message.Timestamp {
+		deltaTimestamp = message.Timestamp - chunkStream.lastOutAbsoluteTimestamp
+	}
+	//	if message.StreamID == 0 {
+	//		timestamp = chunkStream.GetTimestamp()
+	//		fmt.Printf("3. deltaTimestamp: %d\n", deltaTimestamp)
+	//		deltaTimestamp = timestamp - chunkStream.lastAbsoluteTimestamp
+	//		fmt.Printf("4. deltaTimestamp: %d\n", deltaTimestamp)
+	//	}
 	if chunkStream.lastHeader == nil {
 		header.Fmt = HEADER_FMT_FULL
-		if chunkStream.ID == CS_ID_PROTOCOL_CONTROL {
-			// Fix timestamp
-			timestamp = 0
-			deltaTimestamp = 0
-			header.Timestamp = 0
-		} else {
-			header.Timestamp = timestamp
-		}
+		//		if chunkStream.ID == CS_ID_PROTOCOL_CONTROL {
+		//			// Fix timestamp
+		//			timestamp = 0
+		//			deltaTimestamp = 0
+		//			header.Timestamp = 0
+		//		} else {
+		header.Timestamp = timestamp
+		//		}
 	} else {
-		if chunkStream.ID == CS_ID_PROTOCOL_CONTROL {
-			// Fix timestamp
-			timestamp = 0
-			deltaTimestamp = 0
-			header.Timestamp = 0
-		}
+		//if chunkStream.ID == CS_ID_PROTOCOL_CONTROL {
+		//	// Fix timestamp
+		//	timestamp = 0
+		//	deltaTimestamp = 0
+		//	header.Timestamp = 0
+		//}
 
 		if header.MessageStreamID == chunkStream.lastHeader.MessageStreamID {
 			if header.MessageTypeID == chunkStream.lastHeader.MessageTypeID &&
@@ -107,10 +116,14 @@ func (chunkStream *OutboundChunkStream) NewOutboundHeader(message *Message) *Hea
 		header.ExtendedTimestamp = 0
 	}
 	chunkStream.lastHeader = header
-	chunkStream.lastAbsoluteTimestamp = timestamp
+	chunkStream.lastOutAbsoluteTimestamp = timestamp
 	return header
 }
 
 func (chunkStream *OutboundChunkStream) GetTimestamp() uint32 {
+	if chunkStream.startAt == uint32(0) {
+		chunkStream.startAt = GetTimestamp()
+		return uint32(0)
+	}
 	return GetTimestamp() - chunkStream.startAt
 }

@@ -91,7 +91,6 @@ func CalcDigestPos(buf []byte, offset uint32, mod_val uint32, add_val uint32) (d
 
 func ValidateDigest(buf []byte, offset uint32) uint32 {
 	digestPos := CalcDigestPos(buf, offset, 728, offset+4)
-	fmt.Printf("digestPos: %d\n", digestPos)
 	// Create temp buffer
 	tmpBuf := new(bytes.Buffer)
 	tmpBuf.Write(buf[:digestPos])
@@ -125,6 +124,36 @@ func ImprintWithDigest(buf []byte) uint32 {
 		buf[digestPos+uint32(index)] = b
 	}
 	return digestPos
+}
+
+func HandshakeSample(c net.Conn, br *bufio.Reader, bw *bufio.Writer, timeout time.Duration) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = r.(error)
+		}
+	}()
+	// Send C0+C1
+	err = bw.WriteByte(0x03)
+	for i := 0; i < RTMP_SIG_SIZE; i++ {
+		bw.WriteByte(0x00)
+	}
+	err = bw.Flush()
+	CheckError(err, "Handshake() Flush C0+C1")
+	// Read S0+S1+S2
+	s0, err := br.ReadByte()
+	CheckError(err, "Handshake() Read S0")
+	if s0 != 0x03 {
+		return errors.New(fmt.Sprintf("Handshake() Got S0: %x", s0))
+	}
+	s1 := make([]byte, RTMP_SIG_SIZE)
+	_, err = io.ReadAtLeast(br, s1, RTMP_SIG_SIZE)
+	CheckError(err, "Handshake() Read S1")
+	bw.Write(s1)
+	err = bw.Flush()
+	CheckError(err, "Handshake() Flush C2")
+	_, err = io.ReadAtLeast(br, s1, RTMP_SIG_SIZE)
+	CheckError(err, "Handshake() Read S2")
+	return
 }
 
 func Handshake(c net.Conn, br *bufio.Reader, bw *bufio.Writer, timeout time.Duration) (err error) {

@@ -28,10 +28,16 @@ var createStreamChan chan rtmp.OutboundStream
 var videoDataSize int64
 var audioDataSize int64
 var flvFile *flv.File
+var status uint
 
 func (handler *TestOutboundConnHandler) OnStatus() {
-	status, err := obConn.Status()
-	fmt.Printf("status: %d, err: %v\n", status, err)
+	var err error
+	status, err = obConn.Status()
+	fmt.Printf("@@@@@@@@@@@@@status: %d, err: %v\n", status, err)
+}
+
+func (handler *TestOutboundConnHandler) Closed() {
+	fmt.Printf("@@@@@@@@@@@@@Closed\n")
 }
 
 func (handler *TestOutboundConnHandler) Received(message *rtmp.Message) {

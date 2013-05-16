@@ -88,6 +88,7 @@ func Dial(url string, handler OutboundConnHandler, maxChannelNumber int) (Outbou
 	bw := bufio.NewWriter(c)
 	timeout := time.Duration(10) * time.Second
 	err = Handshake(c, br, bw, timeout)
+	//err = HandshakeSample(c, br, bw, timeout)
 	if err == nil {
 		fmt.Println("Handshake OK")
 
@@ -251,6 +252,7 @@ func (obConn *outboundConn) ReceivedCommand(command *Command) {
 						code, ok := information["code"]
 						if ok && code == RESULT_CONNECT_OK {
 							// Connect OK
+							time.Sleep(time.Duration(3) * time.Second)
 							obConn.status = OUTBOUND_CONN_STATUS_CONNECT_OK
 							obConn.handler.OnStatus()
 							obConn.status = OUTBOUND_CONN_STATUS_CREATE_STREAM
@@ -274,6 +276,7 @@ func (obConn *outboundConn) ReceivedCommand(command *Command) {
 						}
 						obConn.streams[stream.ID()] = stream
 						obConn.status = OUTBOUND_CONN_STATUS_CREATE_STREAM_OK
+						obConn.handler.OnStatus()
 						obConn.handler.OnStreamCreated(stream)
 					}
 				}
@@ -289,6 +292,12 @@ func (obConn *outboundConn) ReceivedCommand(command *Command) {
 		}
 	case "onBWCheck":
 	}
+}
+
+// Connection closed
+func (obConn *outboundConn) Closed() {
+	obConn.status = OUTBOUND_CONN_STATUS_CLOSE
+	obConn.handler.OnStatus()
 }
 
 // Create a stream

@@ -36,11 +36,32 @@ func testC1(c1 []byte, offset1 bool) error {
 	return nil
 }
 
+func checkC2(s1, c2 []byte) error {
+	server_pos := ValidateDigest(s1, 8)
+	if server_pos == 0 {
+		server_pos = ValidateDigest(s1, 772)
+		if server_pos == 0 {
+			return errors.New("Server response validating failed")
+		}
+	}
+
+	digest, err := HMACsha256(s1[server_pos:server_pos+SHA256_DIGEST_LENGTH], GENUINE_FP_KEY)
+	CheckError(err, "Get digest from s1 error")
+
+	signature, err := HMACsha256(c2[:RTMP_SIG_SIZE-SHA256_DIGEST_LENGTH], digest)
+	CheckError(err, "Get signature from c2 error")
+
+	if bytes.Compare(signature, c2[RTMP_SIG_SIZE-SHA256_DIGEST_LENGTH:]) != 0 {
+		return errors.New("Server signature mismatch")
+	}
+	return nil
+}
+
 var (
 	testCases = [][]byte{
 		vlc_c1, vlc_c2, vlc_s1,
-		my_c1, my_c2, my_s1,
 		fp_c1, fp_c2, fp_s1,
+		my_c1, my_c2, my_s1,
 	}
 )
 
@@ -71,6 +92,10 @@ func TestHandshake(t *testing.T) {
 			t.Fatalf("C2\nExpect % 2x\nGot    % 2x\n",
 				expect,
 				signatureResp)
+		}
+
+		if err = checkC2(s1, c2); err != nil {
+			t.Errorf("checkC2(%d) err: %s\n", i, err.Error())
 		}
 	}
 }
