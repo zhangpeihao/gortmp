@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	programName = "FlashClient"
+	programName = "RtmpPlayer"
 	version     = "0.0.1"
 )
 

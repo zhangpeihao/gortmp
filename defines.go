@@ -388,8 +388,8 @@ func DumpBuffer(name string, data []byte, ind int) {
 
 // Get timestamp
 func GetTimestamp() uint32 {
-	return uint32(0)
-	//	return uint32((time.Now().UnixNano() / int64(1000000)) % MAX_TIMESTAMP)
+	//return uint32(0)
+	return uint32((time.Now().UnixNano() / int64(1000000)) % MAX_TIMESTAMP)
 }
 
 // Read byte from network
