@@ -165,7 +165,7 @@ func (obConn *outboundConn) Connect(extendedParameters ...interface{}) (err erro
 	_, err = amf.WriteString(buf, obConn.rtmpURL.App())
 	CheckError(err, "Connect() Write app value")
 
-	_, err = amf.WriteObjectName(buf, "flashver")
+	_, err = amf.WriteObjectName(buf, "flashVer")
 	CheckError(err, "Connect() Write flashver name")
 	_, err = amf.WriteString(buf, FLASH_PLAYER_VERSION_STRING)
 	CheckError(err, "Connect() Write flashver value")
@@ -195,15 +195,15 @@ func (obConn *outboundConn) Connect(extendedParameters ...interface{}) (err erro
 	_, err = amf.WriteDouble(buf, DEFAULT_AUDIO_CODECS)
 	CheckError(err, "Connect() Write audioCodecs value")
 
-	_, err = amf.WriteObjectName(buf, "vedioCodecs")
-	CheckError(err, "Connect() Write vedioCodecs name")
+	_, err = amf.WriteObjectName(buf, "videoCodecs")
+	CheckError(err, "Connect() Write videoCodecs name")
 	_, err = amf.WriteDouble(buf, DEFAULT_VIDEO_CODECS)
-	CheckError(err, "Connect() Write vedioCodecs value")
+	CheckError(err, "Connect() Write videoCodecs value")
 
-	_, err = amf.WriteObjectName(buf, "vedioFunction")
-	CheckError(err, "Connect() Write vedioFunction name")
+	_, err = amf.WriteObjectName(buf, "videoFunction")
+	CheckError(err, "Connect() Write videoFunction name")
 	_, err = amf.WriteDouble(buf, float64(1))
-	CheckError(err, "Connect() Write vedioFunction value")
+	CheckError(err, "Connect() Write videoFunction value")
 
 	//	_, err = amf.WriteObjectName(buf, "pageUrl")
 	//	CheckError(err, "Connect() Write pageUrl name")
@@ -282,7 +282,7 @@ func (obConn *outboundConn) ReceivedCommand(command *Command) {
 						code, ok := information["code"]
 						if ok && code == RESULT_CONNECT_OK {
 							// Connect OK
-							time.Sleep(time.Duration(200) * time.Millisecond)
+							//time.Sleep(time.Duration(200) * time.Millisecond)
 							obConn.conn.SetWindowAcknowledgementSize()
 							obConn.status = OUTBOUND_CONN_STATUS_CONNECT_OK
 							obConn.handler.OnStatus()
