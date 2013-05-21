@@ -108,6 +108,36 @@ func Dial(url string, handler OutboundConnHandler, maxChannelNumber int) (Outbou
 	return nil, err
 }
 
+// Connect to FMS server, and finish handshake process
+func NewOutbounConn(c net.Conn, url string, handler OutboundConnHandler, maxChannelNumber int) (OutboundConn, error) {
+	rtmpURL, err := ParseURL(url)
+	if err != nil {
+		return nil, err
+	}
+	if rtmpURL.protocol != "rtmp" {
+		return nil, errors.New(fmt.Sprintf("Unsupport protocol %s", rtmpURL.protocol))
+	}
+	/*
+		ipConn, ok := c.(*net.TCPConn)
+		if ok {
+			ipConn.SetWriteBuffer(128 * 1024)
+		}
+	*/
+	br := bufio.NewReader(c)
+	bw := bufio.NewWriter(c)
+	obConn := &outboundConn{
+		url:              url,
+		rtmpURL:          rtmpURL,
+		handler:          handler,
+		status:           OUTBOUND_CONN_STATUS_HANDSHAKE_OK,
+		transactions:     make(map[uint32]string),
+		streams:          make(map[uint32]OutboundStream),
+		maxChannelNumber: maxChannelNumber,
+	}
+	obConn.conn = NewConn(c, br, bw, obConn, obConn.maxChannelNumber)
+	return obConn, nil
+}
+
 // Connect an appliction on FMS after handshake.
 func (obConn *outboundConn) Connect(extendedParameters ...interface{}) (err error) {
 	defer func() {
@@ -180,10 +210,10 @@ func (obConn *outboundConn) Connect(extendedParameters ...interface{}) (err erro
 	//	_, err = amf.WriteString(buf, PAGE_URL_STRING)
 	//	CheckError(err, "Connect() Write pageUrl value")
 
-	//	_, err = amf.WriteObjectName(buf, "objectEncoding")
-	//	CheckError(err, "Connect() Write objectEncoding name")
-	//	_, err = amf.WriteDouble(buf, float64(amf.AMF3))
-	//	CheckError(err, "Connect() Write objectEncoding value")
+	//_, err = amf.WriteObjectName(buf, "objectEncoding")
+	//CheckError(err, "Connect() Write objectEncoding name")
+	//_, err = amf.WriteDouble(buf, float64(amf.AMF0))
+	//CheckError(err, "Connect() Write objectEncoding value")
 
 	_, err = amf.WriteObjectEndMarker(buf)
 	CheckError(err, "Connect() Write ObjectEndMarker")
@@ -252,7 +282,8 @@ func (obConn *outboundConn) ReceivedCommand(command *Command) {
 						code, ok := information["code"]
 						if ok && code == RESULT_CONNECT_OK {
 							// Connect OK
-							time.Sleep(time.Duration(3) * time.Second)
+							time.Sleep(time.Duration(200) * time.Millisecond)
+							obConn.conn.SetWindowAcknowledgementSize()
 							obConn.status = OUTBOUND_CONN_STATUS_CONNECT_OK
 							obConn.handler.OnStatus()
 							obConn.status = OUTBOUND_CONN_STATUS_CREATE_STREAM

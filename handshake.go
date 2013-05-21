@@ -109,6 +109,7 @@ func ValidateDigest(buf []byte, offset uint32) uint32 {
 }
 
 func ImprintWithDigest(buf []byte) uint32 {
+	//digestPos := CalcDigestPos(buf, 772, 728, 776)
 	digestPos := CalcDigestPos(buf, 8, 728, 12)
 
 	// Create temp buffer
@@ -134,9 +135,11 @@ func HandshakeSample(c net.Conn, br *bufio.Reader, bw *bufio.Writer, timeout tim
 	}()
 	// Send C0+C1
 	err = bw.WriteByte(0x03)
-	for i := 0; i < RTMP_SIG_SIZE; i++ {
-		bw.WriteByte(0x00)
+	c1 := CreateRandomBlock(RTMP_SIG_SIZE)
+	for i := 0; i < 8; i++ {
+		c1[i] = 0
 	}
+	bw.Write(c1)
 	err = bw.Flush()
 	CheckError(err, "Handshake() Flush C0+C1")
 	// Read S0+S1+S2
@@ -168,9 +171,7 @@ func Handshake(c net.Conn, br *bufio.Reader, bw *bufio.Writer, timeout time.Dura
 	c1 := CreateRandomBlock(RTMP_SIG_SIZE)
 	// Set Timestamp
 	// binary.BigEndian.PutUint32(c1, uint32(GetTimestamp()))
-	for i := 0; i < 4; i++ {
-		c1[i] = 0
-	}
+	binary.BigEndian.PutUint32(c1, uint32(0))
 	// Set FlashPlayer version
 	for i := 0; i < 4; i++ {
 		c1[4+i] = FLASH_PLAYER_VERSION[i]

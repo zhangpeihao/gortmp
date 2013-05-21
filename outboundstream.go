@@ -93,7 +93,7 @@ func (stream *outboundStream) Close() {
 		Objects:       make([]interface{}, 1),
 	}
 	cmd.Objects[0] = nil
-	message := NewMessage(stream.chunkStreamID, COMMAND_AMF3, stream.id, nil)
+	message := NewMessage(stream.chunkStreamID, COMMAND_AMF3, stream.id, AUTO_TIMESTAMP, nil)
 	if err = cmd.Write(message.Buf); err != nil {
 		return
 	}
@@ -133,7 +133,7 @@ func (stream *outboundStream) Publish(streamName, howToPublish string) (err erro
 	}
 
 	// Construct message
-	message := NewMessage(stream.chunkStreamID, COMMAND_AMF3, stream.id, nil)
+	message := NewMessage(stream.chunkStreamID, COMMAND_AMF3, stream.id, 0, nil)
 	if err = cmd.Write(message.Buf); err != nil {
 		return
 	}
@@ -144,28 +144,9 @@ func (stream *outboundStream) Publish(streamName, howToPublish string) (err erro
 
 func (stream *outboundStream) Play(streamName string, start, duration *uint32, reset *bool) (err error) {
 	conn := stream.conn.Conn()
-	/*
-		// First send receiveVideo command
-		cmdT := &Command{
-			IsFlex:        false,
-			Name:          "receiveVideo",
-			TransactionID: 0,
-			Objects:       make([]interface{}, 1),
-		}
-		cmdT.Objects[0] = true
-		messageT := NewMessage(stream.chunkStreamID, COMMAND_AMF0, stream.id, nil)
-		if err = cmdT.Write(messageT.Buf); err != nil {
-			return
-		}
-		err = conn.Send(messageT)
-		if err != nil {
-			return
-		}
-	*/
 	// Keng-die: in stream transaction ID always been 0
 	// Get transaction ID
 	transactionID := conn.NewTransactionID()
-
 	// Create play command
 	cmd := &Command{
 		IsFlex:        false,
@@ -196,7 +177,7 @@ func (stream *outboundStream) Play(streamName string, start, duration *uint32, r
 	}
 
 	// Construct message
-	message := NewMessage(stream.chunkStreamID, COMMAND_AMF0, stream.id, nil)
+	message := NewMessage(stream.chunkStreamID, COMMAND_AMF0, stream.id, 0, nil)
 	if err = cmd.Write(message.Buf); err != nil {
 		return
 	}
@@ -213,23 +194,6 @@ func (stream *outboundStream) Play(streamName string, start, duration *uint32, r
 		stream.bufferLength = MIN_BUFFER_LENGTH
 	}
 	stream.conn.Conn().SetStreamBufferSize(stream.id, stream.bufferLength)
-	/*
-		setBufferLengthMessage := NewMessage(CS_ID_PROTOCOL_CONTROL, USER_CONTROL_MESSAGE, 0, nil)
-		respEventType := uint16(EVENT_SET_BUFFER_LENGTH)
-		if err = binary.Write(setBufferLengthMessage.Buf, binary.BigEndian, &respEventType); err != nil {
-			return
-		}
-
-		// Stream ID
-		if err = binary.Write(setBufferLengthMessage.Buf, binary.BigEndian, &stream.id); err != nil {
-			return
-		}
-
-		if err = binary.Write(setBufferLengthMessage.Buf, binary.BigEndian, &stream.bufferLength); err != nil {
-			return
-		}
-		return conn.Send(setBufferLengthMessage)
-	*/
 	return nil
 }
 
@@ -324,21 +288,21 @@ func (stream *outboundStream) Attach(handler OutboundStreamHandler) {
 
 // Publish audio data
 func (stream *outboundStream) PublishAudioData(data []byte, deltaTimestamp uint32) (err error) {
-	message := NewMessage(stream.chunkStreamID, AUDIO_TYPE, stream.id, data)
+	message := NewMessage(stream.chunkStreamID, AUDIO_TYPE, stream.id, AUTO_TIMESTAMP, data)
 	message.Timestamp = deltaTimestamp
 	return stream.conn.Send(message)
 }
 
 // Publish video data
 func (stream *outboundStream) PublishVideoData(data []byte, deltaTimestamp uint32) (err error) {
-	message := NewMessage(stream.chunkStreamID, VIDEO_TYPE, stream.id, data)
+	message := NewMessage(stream.chunkStreamID, VIDEO_TYPE, stream.id, AUTO_TIMESTAMP, data)
 	message.Timestamp = deltaTimestamp
 	return stream.conn.Send(message)
 }
 
 // Publish data
 func (stream *outboundStream) PublishData(dataType uint8, data []byte, deltaTimestamp uint32) (err error) {
-	message := NewMessage(stream.chunkStreamID, dataType, stream.id, data)
+	message := NewMessage(stream.chunkStreamID, dataType, stream.id, AUTO_TIMESTAMP, data)
 	message.Timestamp = deltaTimestamp
 	return stream.conn.Send(message)
 }

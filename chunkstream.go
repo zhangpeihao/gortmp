@@ -2,6 +2,12 @@
 
 package rtmp
 
+/*
+import (
+	"fmt"
+)
+*/
+
 // Chunk stream
 //
 // A logical channel of communication that allows flow of chunks in a
@@ -49,8 +55,10 @@ func (chunkStream *OutboundChunkStream) NewOutboundHeader(message *Message) *Hea
 		MessageStreamID: message.StreamID,
 	}
 	timestamp := message.Timestamp
-	if timestamp == uint32(0) {
+	if timestamp == AUTO_TIMESTAMP {
 		timestamp = chunkStream.GetTimestamp()
+		message.Timestamp = timestamp
+		message.AbsoluteTimestamp = timestamp
 	}
 	deltaTimestamp := uint32(0)
 	if chunkStream.lastOutAbsoluteTimestamp < message.Timestamp {

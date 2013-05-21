@@ -251,16 +251,18 @@ const (
 var (
 	//	FLASH_PLAYER_VERSION = []byte{0x0A, 0x00, 0x2D, 0x02}
 	FLASH_PLAYER_VERSION = []byte{0x09, 0x00, 0x7C, 0x02}
-	//FLASH_PLAYER_VERSION        = []byte{0x80, 0x00, 0x07, 0x02}
+	//FLASH_PLAYER_VERSION = []byte{0x80, 0x00, 0x07, 0x02}
 	//FLASH_PLAYER_VERSION_STRING = "LNX 10,0,32,18"
 	FLASH_PLAYER_VERSION_STRING = "LNX 9,0,124,2"
-	SWF_URL_STRING              = "http://localhost/1.swf"
-	PAGE_URL_STRING             = "http://localhost/1.html"
-	MIN_BUFFER_LENGTH           = uint32(256)
+	//FLASH_PLAYER_VERSION_STRING = "WIN 11,5,502,146"
+	SWF_URL_STRING    = "http://localhost/1.swf"
+	PAGE_URL_STRING   = "http://localhost/1.html"
+	MIN_BUFFER_LENGTH = uint32(256)
 )
 
 const (
-	MAX_TIMESTAMP                       = 2000000000
+	MAX_TIMESTAMP                       = uint32(2000000000)
+	AUTO_TIMESTAMP                      = uint32(0XFFFFFFFF)
 	DEFAULT_HIGH_PRIORITY_BUFFER_SIZE   = 2048
 	DEFAULT_MIDDLE_PRIORITY_BUFFER_SIZE = 128
 	DEFAULT_LOW_PRIORITY_BUFFER_SIZE    = 64
@@ -389,7 +391,7 @@ func DumpBuffer(name string, data []byte, ind int) {
 // Get timestamp
 func GetTimestamp() uint32 {
 	//return uint32(0)
-	return uint32((time.Now().UnixNano() / int64(1000000)) % MAX_TIMESTAMP)
+	return uint32(time.Now().UnixNano()/int64(1000000)) % MAX_TIMESTAMP
 }
 
 // Read byte from network

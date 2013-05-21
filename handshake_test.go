@@ -11,7 +11,7 @@ const (
 	TEST_FMS_URL = "rtmp://192.168.20.111/live"
 )
 
-func testC1(c1 []byte, offset1 bool) error {
+func testC1(c1 []byte, offset1 bool) (uint32, error) {
 	var clientDigestOffset uint32
 	if offset1 {
 		clientDigestOffset = CalcDigestPos(c1, 8, 728, 12)
@@ -25,23 +25,23 @@ func testC1(c1 []byte, offset1 bool) error {
 	// Generate the hash
 	tempHash, err := HMACsha256(tmpBuf.Bytes(), GENUINE_FP_KEY[:30])
 	if err != nil {
-		return errors.New(fmt.Sprintf("HMACsha256 err: %s\n", err.Error()))
+		return 0, errors.New(fmt.Sprintf("HMACsha256 err: %s\n", err.Error()))
 	}
 	expect := c1[clientDigestOffset : clientDigestOffset+SHA256_DIGEST_LENGTH]
 	if bytes.Compare(expect, tempHash) != 0 {
-		return errors.New(fmt.Sprintf("C1\nExpect % 2x\nGot    % 2x\n",
+		return 0, errors.New(fmt.Sprintf("C1\nExpect % 2x\nGot    % 2x\n",
 			expect,
 			tempHash))
 	}
-	return nil
+	return clientDigestOffset, nil
 }
 
-func checkC2(s1, c2 []byte) error {
+func checkC2(s1, c2 []byte) (uint32, error) {
 	server_pos := ValidateDigest(s1, 8)
 	if server_pos == 0 {
 		server_pos = ValidateDigest(s1, 772)
 		if server_pos == 0 {
-			return errors.New("Server response validating failed")
+			return 0, errors.New("Server response validating failed")
 		}
 	}
 
@@ -52,9 +52,9 @@ func checkC2(s1, c2 []byte) error {
 	CheckError(err, "Get signature from c2 error")
 
 	if bytes.Compare(signature, c2[RTMP_SIG_SIZE-SHA256_DIGEST_LENGTH:]) != 0 {
-		return errors.New("Server signature mismatch")
+		return 0, errors.New("Server signature mismatch")
 	}
-	return nil
+	return server_pos, nil
 }
 
 var (
@@ -72,8 +72,8 @@ func TestHandshake(t *testing.T) {
 		c2 := testCases[i*3+1]
 		s1 := testCases[i*3+2]
 
-		if err := testC1(c1, true); err != nil {
-			if err = testC1(c1, false); err != nil {
+		if _, err := testC1(c1, true); err != nil {
+			if _, err = testC1(c1, false); err != nil {
 				t.Error(err.Error())
 			}
 		}
@@ -94,7 +94,7 @@ func TestHandshake(t *testing.T) {
 				signatureResp)
 		}
 
-		if err = checkC2(s1, c2); err != nil {
+		if _, err = checkC2(s1, c2); err != nil {
 			t.Errorf("checkC2(%d) err: %s\n", i, err.Error())
 		}
 	}

@@ -30,6 +30,7 @@ type Conn interface {
 	SetStreamBufferSize(streamId uint32, size uint32)
 	OutboundChunkStream(id uint32) (chunkStream *OutboundChunkStream, found bool)
 	InboundChunkStream(id uint32) (chunkStream *InboundChunkStream, found bool)
+	SetWindowAcknowledgementSize()
 }
 
 // Connection handler
@@ -162,7 +163,7 @@ func (conn *conn) sendMessage(message *Message) {
 	}
 	//	header.Dump(">>>")
 	if header.MessageLength > conn.outChunkSize {
-		chunkStream.lastHeader = nil
+		//		chunkStream.lastHeader = nil
 		// Split into some chunk
 		_, err = CopyNToNetwork(conn.bw, message.Buf, int64(conn.outChunkSize))
 		if err != nil {
@@ -316,12 +317,8 @@ func (conn *conn) readLoop() {
 			chunkstream.lastHeader = header
 			absoluteTimestamp = chunkstream.lastInAbsoluteTimestamp + header.Timestamp
 		case HEADER_FMT_CONTINUATION:
-			// Continuation the previous unfinished message
-			if chunkstream.receivedMessage == nil {
-				// Some error
-				fmt.Println("No unfinished message in cuntinuation fmt!")
-				header.Dump("err")
-			} else {
+			if chunkstream.receivedMessage != nil {
+				// Continuation the previous unfinished message
 				message = chunkstream.receivedMessage
 			}
 			if chunkstream.lastHeader == nil {
@@ -405,7 +402,7 @@ func (conn *conn) readLoop() {
 		// Check window
 		if conn.inBytes > (conn.inBytesPreWindow + conn.inWindowSize) {
 			// Send window acknowledgement
-			ackmessage := NewMessage(CS_ID_PROTOCOL_CONTROL, ACKNOWLEDGEMENT, 0, nil)
+			ackmessage := NewMessage(CS_ID_PROTOCOL_CONTROL, ACKNOWLEDGEMENT, 0, absoluteTimestamp+1, nil)
 			err = binary.Write(ackmessage.Buf, binary.BigEndian, conn.inBytes)
 			CheckError(err, "ACK Message write data")
 			conn.inBytesPreWindow = conn.inBytes
@@ -565,7 +562,7 @@ func (conn *conn) received(message *Message) {
 				return
 			}
 
-			subMessage := NewMessage(message.ChunkStreamID, subType, message.StreamID, nil)
+			subMessage := NewMessage(message.ChunkStreamID, subType, message.StreamID, 0, nil)
 			subMessage.Timestamp = timestamp - firstAggregateTimestamp
 			subMessage.IsInbound = true
 			subMessage.AbsoluteTimestamp = subMessage.Timestamp + message.AbsoluteTimestamp
@@ -773,7 +770,7 @@ func (conn *conn) invokeUserControlMessage(message *Message) {
 			fmt.Printf("invokeUserControlMessage() read serverTimestamp err: %s\n", err.Error())
 			return
 		}
-		respmessage := NewMessage(CS_ID_PROTOCOL_CONTROL, USER_CONTROL_MESSAGE, 0, nil)
+		respmessage := NewMessage(CS_ID_PROTOCOL_CONTROL, USER_CONTROL_MESSAGE, 0, message.Timestamp+1, nil)
 		respEventType := uint16(EVENT_PING_RESPONSE)
 		if err = binary.Write(respmessage.Buf, binary.BigEndian, &respEventType); err != nil {
 			fmt.Println("invokeUserControlMessage write event type err:", err)
@@ -808,18 +805,6 @@ func (conn *conn) invokeWindowAcknowledgementSize(message *Message) {
 		return
 	}
 	conn.inWindowSize = size
-	// Request window  acknowledgement size
-	resp := &Message{
-		ChunkStreamID: CS_ID_PROTOCOL_CONTROL,
-		Type:          WINDOW_ACKNOWLEDGEMENT_SIZE,
-		Buf:           new(bytes.Buffer),
-	}
-	if err = binary.Write(resp.Buf, binary.BigEndian, &conn.outWindowSize); err != nil {
-		fmt.Println("invokeWindowAcknowledgementSize write window size err:", err)
-		return
-	}
-	resp.Size = uint32(resp.Buf.Len())
-	conn.Send(resp)
 }
 
 func (conn *conn) invokeSetPeerBandwidth(message *Message) {
@@ -843,7 +828,7 @@ func (conn *conn) invokeCommand(cmd *Command) {
 }
 
 func (conn *conn) SetStreamBufferSize(streamId uint32, size uint32) {
-	message := NewMessage(CS_ID_PROTOCOL_CONTROL, USER_CONTROL_MESSAGE, 0, nil)
+	message := NewMessage(CS_ID_PROTOCOL_CONTROL, USER_CONTROL_MESSAGE, 0, 1, nil)
 	eventType := uint16(EVENT_SET_BUFFER_LENGTH)
 	if err := binary.Write(message.Buf, binary.BigEndian, &eventType); err != nil {
 		fmt.Println("SetStreamBufferSize write event type err:", err)
@@ -861,11 +846,22 @@ func (conn *conn) SetStreamBufferSize(streamId uint32, size uint32) {
 }
 
 func (conn *conn) SetChunkSize(size uint32) {
-	message := NewMessage(CS_ID_PROTOCOL_CONTROL, SET_CHUNK_SIZE, 0, nil)
+	message := NewMessage(CS_ID_PROTOCOL_CONTROL, SET_CHUNK_SIZE, 0, 0, nil)
 	if err := binary.Write(message.Buf, binary.BigEndian, &size); err != nil {
 		fmt.Println("SetChunkSize write event type err:", err)
 		return
 	}
 	conn.outChunkSizeTemp = size
+	conn.Send(message)
+}
+
+func (conn *conn) SetWindowAcknowledgementSize() {
+	// Request window acknowledgement size
+	message := NewMessage(CS_ID_PROTOCOL_CONTROL, WINDOW_ACKNOWLEDGEMENT_SIZE, 0, 0, nil)
+	if err := binary.Write(message.Buf, binary.BigEndian, &conn.outWindowSize); err != nil {
+		fmt.Println("SetWindowAcknowledgementSize write window size err:", err)
+		return
+	}
+	message.Size = uint32(message.Buf.Len())
 	conn.Send(message)
 }

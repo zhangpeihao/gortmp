@@ -24,12 +24,14 @@ type Message struct {
 	AbsoluteTimestamp uint32
 }
 
-func NewMessage(csi uint32, t uint8, sid uint32, data []byte) *Message {
+func NewMessage(csi uint32, t uint8, sid uint32, ts uint32, data []byte) *Message {
 	message := &Message{
-		ChunkStreamID: csi,
-		Type:          t,
-		StreamID:      sid,
-		Buf:           new(bytes.Buffer),
+		ChunkStreamID:     csi,
+		Type:              t,
+		StreamID:          sid,
+		Timestamp:         ts,
+		AbsoluteTimestamp: ts,
+		Buf:               new(bytes.Buffer),
 	}
 	if data != nil {
 		message.Buf.Write(data)
