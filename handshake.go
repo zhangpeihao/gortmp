@@ -100,8 +100,6 @@ func ValidateDigest(buf []byte, offset uint32) uint32 {
 	if err != nil {
 		return 0
 	}
-	//fmt.Printf("tempHash: % 2x\n", tempHash)
-	//fmt.Printf("Got     : % 2x\n", buf[digestPos:digestPos+SHA256_DIGEST_LENGTH])
 	if bytes.Compare(tempHash, buf[digestPos:digestPos+SHA256_DIGEST_LENGTH]) == 0 {
 		return digestPos
 	}
@@ -246,9 +244,8 @@ func Handshake(c net.Conn, br *bufio.Reader, bw *bufio.Writer, timeout time.Dura
 	CheckError(err, "Generate C2 HMACsha256 digestResp")
 
 	c2 := CreateRandomBlock(RTMP_SIG_SIZE)
-	fmt.Printf("len(digestResp) = %d\n", len(digestResp))
 	signatureResp, err := HMACsha256(c2[:RTMP_SIG_SIZE-SHA256_DIGEST_LENGTH], digestResp)
-	//CheckError(err, "Generate C2 HMACsha256 signatureResp")
+	CheckError(err, "Generate C2 HMACsha256 signatureResp")
 	DumpBuffer("signatureResp", signatureResp, 0)
 	for index, b := range signatureResp {
 		c2[RTMP_SIG_SIZE-SHA256_DIGEST_LENGTH+index] = b

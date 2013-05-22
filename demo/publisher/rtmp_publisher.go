@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/zhangpeihao/goflv"
 	"github.com/zhangpeihao/gortmp"
+	"github.com/zhangpeihao/log"
 	"os"
 	"time"
 )
@@ -126,6 +127,9 @@ func main() {
 	}
 	flag.Parse()
 
+	l := log.NewLogger(".", "publisher", nil, 60, 3600*24, true)
+	rtmp.InitLogger(l)
+	defer l.Close()
 	createStreamChan = make(chan rtmp.OutboundStream)
 	testHandler := &TestOutboundConnHandler{}
 	fmt.Println("to dial")

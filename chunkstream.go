@@ -2,11 +2,9 @@
 
 package rtmp
 
-/*
 import (
-	"fmt"
+	"github.com/zhangpeihao/log"
 )
-*/
 
 // Chunk stream
 //
@@ -64,29 +62,10 @@ func (chunkStream *OutboundChunkStream) NewOutboundHeader(message *Message) *Hea
 	if chunkStream.lastOutAbsoluteTimestamp < message.Timestamp {
 		deltaTimestamp = message.Timestamp - chunkStream.lastOutAbsoluteTimestamp
 	}
-	//	if message.StreamID == 0 {
-	//		timestamp = chunkStream.GetTimestamp()
-	//		fmt.Printf("3. deltaTimestamp: %d\n", deltaTimestamp)
-	//		deltaTimestamp = timestamp - chunkStream.lastAbsoluteTimestamp
-	//		fmt.Printf("4. deltaTimestamp: %d\n", deltaTimestamp)
-	//	}
 	if chunkStream.lastHeader == nil {
 		header.Fmt = HEADER_FMT_FULL
-		//		if chunkStream.ID == CS_ID_PROTOCOL_CONTROL {
-		//			// Fix timestamp
-		//			timestamp = 0
-		//			deltaTimestamp = 0
-		//			header.Timestamp = 0
-		//		} else {
 		header.Timestamp = timestamp
-		//		}
 	} else {
-		//if chunkStream.ID == CS_ID_PROTOCOL_CONTROL {
-		//	// Fix timestamp
-		//	timestamp = 0
-		//	deltaTimestamp = 0
-		//	header.Timestamp = 0
-		//}
 
 		if header.MessageStreamID == chunkStream.lastHeader.MessageStreamID {
 			if header.MessageTypeID == chunkStream.lastHeader.MessageTypeID &&
@@ -123,6 +102,8 @@ func (chunkStream *OutboundChunkStream) NewOutboundHeader(message *Message) *Hea
 	} else {
 		header.ExtendedTimestamp = 0
 	}
+	logger.ModulePrintf(logHandler, log.LOG_LEVEL_DEBUG,
+		"OutboundChunkStream::NewOutboundHeader() header: %+v\n", header)
 	chunkStream.lastHeader = header
 	chunkStream.lastOutAbsoluteTimestamp = timestamp
 	return header

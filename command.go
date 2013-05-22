@@ -3,8 +3,8 @@
 package rtmp
 
 import (
-	"fmt"
 	"github.com/zhangpeihao/goamf"
+	"github.com/zhangpeihao/log"
 )
 
 // Command
@@ -45,6 +45,7 @@ func (cmd *Command) Write(w Writer) (err error) {
 }
 
 func (cmd *Command) Dump() {
-	fmt.Printf("Command{IsFlex: %t, Name: %s, TransactionID: %d, Objects: %+v}\n",
+	logger.ModulePrintf(logHandler, log.LOG_LEVEL_DEBUG,
+		"Command{IsFlex: %t, Name: %s, TransactionID: %d, Objects: %+v}\n",
 		cmd.IsFlex, cmd.Name, cmd.TransactionID, cmd.Objects)
 }

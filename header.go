@@ -5,7 +5,7 @@ package rtmp
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
+	"github.com/zhangpeihao/log"
 )
 
 // RTMP Chunk Header
@@ -227,8 +227,9 @@ func (header *Header) ReadHeader(rbuf Reader, vfmt uint8, csi uint32) (n int, er
 		}
 		n += 4
 		header.ExtendedTimestamp = binary.BigEndian.Uint32(tmpBuf)
-		//		fmt.Printf("Extened timestamp: %d, timestamp: %d\n", header.ExtendedTimestamp, header.Timestamp)
-		//		header.Dump("Extended timestamp")
+		logger.ModulePrintf(logHandler, log.LOG_LEVEL_DEBUG,
+			"Extened timestamp: %d, timestamp: %d\n", header.ExtendedTimestamp, header.Timestamp)
+		header.Dump("Extended timestamp")
 	} else {
 		header.ExtendedTimestamp = 0
 	}
@@ -356,7 +357,8 @@ func (header *Header) RealTimestamp() uint32 {
 }
 
 func (header *Header) Dump(name string) {
-	fmt.Printf("Header(%s){Fmt: %d, ChunkStreamID: %d, Timestamp: %d, MessageLength: %d, MessageTypeID: %d, MessageStreamID: %d, ExtendedTimestamp: %d}\n", name,
+	logger.ModulePrintf(logHandler, log.LOG_LEVEL_DEBUG,
+		"Header(%s){Fmt: %d, ChunkStreamID: %d, Timestamp: %d, MessageLength: %d, MessageTypeID: %d, MessageStreamID: %d, ExtendedTimestamp: %d}\n", name,
 		header.Fmt, header.ChunkStreamID, header.Timestamp, header.MessageLength,
 		header.MessageTypeID, header.MessageStreamID, header.ExtendedTimestamp)
 }

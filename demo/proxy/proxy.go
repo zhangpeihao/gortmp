@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/zhangpeihao/gortmp"
+	"github.com/zhangpeihao/log"
 	"io"
 	"net"
 	"os"
@@ -28,6 +29,9 @@ func main() {
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+	l := log.NewLogger(".", "proxy", nil, 60, 3600*24, true)
+	rtmp.InitLogger(l)
+	defer l.Close()
 
 	// listen
 	listen, err := net.Listen("tcp", ":1935")

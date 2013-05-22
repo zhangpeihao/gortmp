@@ -1,6 +1,7 @@
 package rtmp
 
 import (
+	"github.com/zhangpeihao/log"
 	"testing"
 	"time"
 )
@@ -43,7 +44,15 @@ func compareRtmpURL(a, b RtmpURL) bool {
 		(a.instanceName == b.instanceName)
 }
 
+func InitTestLogger() {
+	if logger == nil {
+		l := log.NewLogger(".", "test", nil, 60, 3600*24, true)
+		InitLogger(l)
+	}
+}
+
 func TestParseURL(t *testing.T) {
+	InitTestLogger()
 	for _, c := range testParseURLCase {
 		got, err := ParseURL(c.url)
 		if err != nil {
@@ -63,6 +72,7 @@ func TestParseURL(t *testing.T) {
 }
 
 func TestGetTimestamp(t *testing.T) {
+	InitTestLogger()
 	t1 := GetTimestamp()
 	if t1 >= MAX_TIMESTAMP {
 		t.Errorf("Got timestamp %d > Max value(%d)", t1, MAX_TIMESTAMP)

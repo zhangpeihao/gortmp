@@ -66,6 +66,7 @@ var (
 )
 
 func TestHandshake(t *testing.T) {
+	InitTestLogger()
 	caseNum := len(testCases) / 3
 	for i := 0; i < caseNum; i++ {
 		c1 := testCases[i*3]

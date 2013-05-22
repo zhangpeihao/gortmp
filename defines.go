@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/zhangpeihao/goamf"
+	"github.com/zhangpeihao/log"
 	"io"
 	"net"
 	"strconv"
@@ -16,6 +17,12 @@ import (
 )
 
 var DefaultObjectEncoding uint = amf.AMF0
+var logger *log.Logger
+var logHandler log.LoggerModule
+
+const (
+	RTMP_LOG_NAME = "rtmp"
+)
 
 // Chunk Message Header - "fmt" field values
 const (
@@ -291,6 +298,13 @@ type RtmpURL struct {
 	instanceName string
 }
 
+// Init log module
+// Must initialize log first.
+func InitLogger(l *log.Logger) {
+	logger = l
+	logHandler = logger.LoggerModule(RTMP_LOG_NAME)
+}
+
 // Check error
 //
 // If error panic
@@ -375,17 +389,21 @@ func (rtmpUrl *RtmpURL) App() string {
 
 // Dump buffer
 func DumpBuffer(name string, data []byte, ind int) {
-	fmt.Printf("Buffer(%s):\n", name)
-	for i := 0; i < len(data); i++ {
-		fmt.Printf("%02x ", data[i])
-		switch (i + 1 + ind) % 16 {
-		case 0:
-			fmt.Println("")
-		case 8:
-			fmt.Print(" ")
+	if logger.ModuleLevelCheck(logHandler, log.LOG_LEVEL_DEBUG) {
+		var logstring string
+		logstring = fmt.Sprintf("Buffer(%s):\n", name)
+		for i := 0; i < len(data); i++ {
+			logstring += fmt.Sprintf("%02x ", data[i])
+			switch (i + 1 + ind) % 16 {
+			case 0:
+				logstring += fmt.Sprintln("")
+			case 8:
+				logstring += fmt.Sprint(" ")
+			}
 		}
+		logstring += fmt.Sprintln("")
+		logger.ModulePrintln(logHandler, log.LOG_LEVEL_DEBUG, logstring)
 	}
-	fmt.Println("")
 }
 
 // Get timestamp
@@ -409,7 +427,8 @@ func ReadByteFromNetwork(r Reader) (b byte, err error) {
 		if !netErr.Temporary() {
 			return
 		}
-		fmt.Println("ReadByteFromNetwork !!!!!!!!!!!!!!!!!!")
+		logger.ModulePrintln(logHandler, log.LOG_LEVEL_DEBUG,
+			"ReadByteFromNetwork block")
 		if retry < 16 {
 			retry = retry * 2
 		}
@@ -433,7 +452,8 @@ func ReadAtLeastFromNetwork(r Reader, buf []byte, min int) (n int, err error) {
 		if !netErr.Temporary() {
 			return
 		}
-		fmt.Println("ReadAtLeastFromNetwork !!!!!!!!!!!!!!!!!!")
+		logger.ModulePrintln(logHandler, log.LOG_LEVEL_DEBUG,
+			"ReadAtLeastFromNetwork !!!!!!!!!!!!!!!!!!")
 		if retry < 16 {
 			retry = retry * 2
 		}
@@ -492,7 +512,8 @@ func WriteToNetwork(w Writer, data []byte) (written int, err error) {
 		if !netErr.Temporary() {
 			return
 		}
-		fmt.Println("WriteToNetwork !!!!!!!!!!!!!!!!!!")
+		logger.ModulePrintln(logHandler, log.LOG_LEVEL_DEBUG,
+			"WriteToNetwork !!!!!!!!!!!!!!!!!!")
 		if retry < 16 {
 			retry = retry * 2
 		}
@@ -549,7 +570,8 @@ func FlushToNetwork(w *bufio.Writer) (err error) {
 		if !netErr.Temporary() {
 			return
 		}
-		fmt.Println("FlushToNetwork !!!!!!!!!!!!!!!!!!")
+		logger.ModulePrintln(logHandler, log.LOG_LEVEL_DEBUG,
+			"FlushToNetwork !!!!!!!!!!!!!!!!!!")
 		if retry < 16 {
 			retry = retry * 2
 		}
