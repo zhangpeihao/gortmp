@@ -34,9 +34,12 @@ const (
 
 // Result codes
 const (
-	RESULT_CONNECT_OK       = "NetConnection.Connect.Success"
-	NETSTREAM_PLAY_START    = "NetStream.Play.Start"
-	NETSTREAM_PUBLISH_START = "NetStream.Publish.Start"
+	RESULT_CONNECT_OK            = "NetConnection.Connect.Success"
+	RESULT_CONNECT_REJECTED      = "NetConnection.Connect.Rejected"
+	RESULT_CONNECT_OK_DESC       = "Connection successed."
+	RESULT_CONNECT_REJECTED_DESC = "[ AccessManager.Reject ] : [ code=400 ] : "
+	NETSTREAM_PLAY_START         = "NetStream.Play.Start"
+	NETSTREAM_PUBLISH_START      = "NetStream.Publish.Start"
 )
 
 // Chunk stream ID
@@ -262,9 +265,11 @@ var (
 	//FLASH_PLAYER_VERSION_STRING = "LNX 10,0,32,18"
 	FLASH_PLAYER_VERSION_STRING = "LNX 9,0,124,2"
 	//FLASH_PLAYER_VERSION_STRING = "WIN 11,5,502,146"
-	SWF_URL_STRING    = "http://localhost/1.swf"
-	PAGE_URL_STRING   = "http://localhost/1.html"
-	MIN_BUFFER_LENGTH = uint32(256)
+	SWF_URL_STRING     = "http://localhost/1.swf"
+	PAGE_URL_STRING    = "http://localhost/1.html"
+	MIN_BUFFER_LENGTH  = uint32(256)
+	FMS_VERSION        = []byte{0x04, 0x05, 0x00, 0x01}
+	FMS_VERSION_STRING = "4,5,0,297"
 )
 
 const (
@@ -278,6 +283,8 @@ const (
 	DEFAULT_CAPABILITIES                = float64(15)
 	DEFAULT_AUDIO_CODECS                = float64(4071)
 	DEFAULT_VIDEO_CODECS                = float64(252)
+	FMS_CAPBILITIES                     = uint32(255)
+	FMS_MODE                            = uint32(2)
 )
 
 type Writer interface {

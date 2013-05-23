@@ -56,15 +56,14 @@ type OutboundConn interface {
 // A RTMP connection(based on TCP) to RTMP server(FMS or crtmpserver).
 // In one connection, we can create many chunk streams.
 type outboundConn struct {
-	url              string
-	rtmpURL          RtmpURL
-	status           uint
-	err              error
-	handler          OutboundConnHandler
-	conn             Conn
-	transactions     map[uint32]string
-	streams          map[uint32]OutboundStream
-	maxChannelNumber int
+	url          string
+	rtmpURL      RtmpURL
+	status       uint
+	err          error
+	handler      OutboundConnHandler
+	conn         Conn
+	transactions map[uint32]string
+	streams      map[uint32]OutboundStream
 }
 
 // Connect to FMS server, and finish handshake process
@@ -94,15 +93,14 @@ func Dial(url string, handler OutboundConnHandler, maxChannelNumber int) (Outbou
 		logger.ModulePrintln(logHandler, log.LOG_LEVEL_DEBUG, "Handshake OK")
 
 		obConn := &outboundConn{
-			url:              url,
-			rtmpURL:          rtmpURL,
-			handler:          handler,
-			status:           OUTBOUND_CONN_STATUS_HANDSHAKE_OK,
-			transactions:     make(map[uint32]string),
-			streams:          make(map[uint32]OutboundStream),
-			maxChannelNumber: maxChannelNumber,
+			url:          url,
+			rtmpURL:      rtmpURL,
+			handler:      handler,
+			status:       OUTBOUND_CONN_STATUS_HANDSHAKE_OK,
+			transactions: make(map[uint32]string),
+			streams:      make(map[uint32]OutboundStream),
 		}
-		obConn.conn = NewConn(c, br, bw, obConn, obConn.maxChannelNumber)
+		obConn.conn = NewConn(c, br, bw, obConn, maxChannelNumber)
 		return obConn, nil
 	}
 
@@ -127,15 +125,14 @@ func NewOutbounConn(c net.Conn, url string, handler OutboundConnHandler, maxChan
 	br := bufio.NewReader(c)
 	bw := bufio.NewWriter(c)
 	obConn := &outboundConn{
-		url:              url,
-		rtmpURL:          rtmpURL,
-		handler:          handler,
-		status:           OUTBOUND_CONN_STATUS_HANDSHAKE_OK,
-		transactions:     make(map[uint32]string),
-		streams:          make(map[uint32]OutboundStream),
-		maxChannelNumber: maxChannelNumber,
+		url:          url,
+		rtmpURL:      rtmpURL,
+		handler:      handler,
+		status:       OUTBOUND_CONN_STATUS_HANDSHAKE_OK,
+		transactions: make(map[uint32]string),
+		streams:      make(map[uint32]OutboundStream),
 	}
-	obConn.conn = NewConn(c, br, bw, obConn, obConn.maxChannelNumber)
+	obConn.conn = NewConn(c, br, bw, obConn, maxChannelNumber)
 	return obConn, nil
 }
 
@@ -224,8 +221,7 @@ func (obConn *outboundConn) Connect(extendedParameters ...interface{}) (err erro
 		_, err = amf.WriteValue(buf, param)
 		CheckError(err, "Connect() Write extended parameters")
 	}
-
-	connectMessage := Message{
+	connectMessage := &Message{
 		ChunkStreamID: CS_ID_COMMAND,
 		Type:          COMMAND_AMF0,
 		Size:          uint32(buf.Len()),
@@ -233,7 +229,7 @@ func (obConn *outboundConn) Connect(extendedParameters ...interface{}) (err erro
 	}
 	connectMessage.Dump("connect")
 	obConn.status = OUTBOUND_CONN_STATUS_CONNECT
-	return obConn.conn.Send(&connectMessage)
+	return obConn.conn.Send(connectMessage)
 }
 
 // Close a connection
@@ -359,14 +355,14 @@ func (obConn *outboundConn) CreateStream() (err error) {
 	CheckError(err, "createStream() Create command")
 	obConn.transactions[transactionID] = "createStream"
 
-	message := Message{
+	message := &Message{
 		ChunkStreamID: CS_ID_COMMAND,
 		Type:          COMMAND_AMF0,
 		Size:          uint32(buf.Len()),
 		Buf:           buf,
 	}
 	message.Dump("createStream")
-	return obConn.conn.Send(&message)
+	return obConn.conn.Send(message)
 }
 
 // Send a message
