@@ -99,14 +99,14 @@ func CalcDHPos(buf []byte, offset uint32, mod_val uint32, add_val uint32) (diges
 	return
 }
 
-func ValidateDigest(buf []byte, offset uint32) uint32 {
+func ValidateDigest(buf []byte, offset uint32, key []byte) uint32 {
 	digestPos := CalcDigestPos(buf, offset, 728, offset+4)
 	// Create temp buffer
 	tmpBuf := new(bytes.Buffer)
 	tmpBuf.Write(buf[:digestPos])
 	tmpBuf.Write(buf[digestPos+SHA256_DIGEST_LENGTH:])
 	// Generate the hash
-	tempHash, err := HMACsha256(tmpBuf.Bytes(), GENUINE_FMS_KEY[:36])
+	tempHash, err := HMACsha256(tmpBuf.Bytes(), key)
 	if err != nil {
 		return 0
 	}
@@ -232,9 +232,9 @@ func Handshake(c net.Conn, br *bufio.Reader, bw *bufio.Writer, timeout time.Dura
 	CheckError(err, "Handshake() Read S2")
 
 	// Check server response
-	server_pos := ValidateDigest(s1, 8)
+	server_pos := ValidateDigest(s1, 8, GENUINE_FMS_KEY[:36])
 	if server_pos == 0 {
-		server_pos = ValidateDigest(s1, 772)
+		server_pos = ValidateDigest(s1, 772, GENUINE_FMS_KEY[:36])
 		if server_pos == 0 {
 			return errors.New("Server response validating failed")
 		}
@@ -326,12 +326,21 @@ func SHandshake(c net.Conn, br *bufio.Reader, bw *bufio.Writer, timeout time.Dur
 	logger.ModulePrintf(logHandler, log.LOG_LEVEL_DEBUG,
 		"SHandshake() Flash player version is %d.%d.%d.%d", c1[4], c1[5], c1[6], c1[7])
 
-	clientDHOffset := CalcDHPos(c1, 1532, 632, 772)
+	scheme := 0
+	clientDigestOffset := ValidateDigest(c1, 8, GENUINE_FP_KEY[:30])
+	if clientDigestOffset == 0 {
+		clientDigestOffset = ValidateDigest(c1, 772, GENUINE_FP_KEY[:30])
+		if clientDigestOffset == 0 {
+			return errors.New("SHandshake C1 validating failed")
+		}
+		scheme = 1
+	}
+	logger.ModulePrintf(logHandler, log.LOG_LEVEL_DEBUG,
+		"SHandshake() scheme = %d", scheme)
+	digestResp, err := HMACsha256(c1[clientDigestOffset:clientDigestOffset+SHA256_DIGEST_LENGTH], GENUINE_FMS_KEY)
+	CheckError(err, "SHandshake Generate digestResp")
 
 	// Generate S2
-	digestResp, err := HMACsha256(c1[clientDHOffset:clientDHOffset+SHA256_DIGEST_LENGTH], GENUINE_FMS_KEY)
-	CheckError(err, "SHandshake Generate S2 HMACsha256 digestResp")
-
 	s2 := CreateRandomBlock(RTMP_SIG_SIZE)
 	signatureResp, err := HMACsha256(s2[:RTMP_SIG_SIZE-SHA256_DIGEST_LENGTH], digestResp)
 	CheckError(err, "SHandshake Generate S2 HMACsha256 signatureResp")

@@ -253,19 +253,19 @@ func (obConn *outboundConn) Status() (uint, error) {
 }
 
 // Callback when recieved message. Audio & Video data
-func (obConn *outboundConn) Received(message *Message) {
+func (obConn *outboundConn) OnReceived(message *Message) {
 	stream, found := obConn.streams[message.StreamID]
 	if found {
 		if !stream.Received(message) {
-			obConn.handler.Received(message)
+			obConn.handler.OnReceived(message)
 		}
 	} else {
-		obConn.handler.Received(message)
+		obConn.handler.OnReceived(message)
 	}
 }
 
 // Callback when recieved message.
-func (obConn *outboundConn) ReceivedCommand(command *Command) {
+func (obConn *outboundConn) OnReceivedCommand(command *Command) {
 	command.Dump()
 	switch command.Name {
 	case "_result":
@@ -326,7 +326,7 @@ func (obConn *outboundConn) ReceivedCommand(command *Command) {
 }
 
 // Connection closed
-func (obConn *outboundConn) Closed() {
+func (obConn *outboundConn) OnClosed() {
 	obConn.status = OUTBOUND_CONN_STATUS_CLOSE
 	obConn.handler.OnStatus()
 }

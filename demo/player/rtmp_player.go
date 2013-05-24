@@ -42,11 +42,11 @@ func (handler *TestOutboundConnHandler) OnStatus() {
 	fmt.Printf("@@@@@@@@@@@@@status: %d, err: %v\n", status, err)
 }
 
-func (handler *TestOutboundConnHandler) Closed() {
+func (handler *TestOutboundConnHandler) OnClosed() {
 	fmt.Printf("@@@@@@@@@@@@@Closed\n")
 }
 
-func (handler *TestOutboundConnHandler) Received(message *rtmp.Message) {
+func (handler *TestOutboundConnHandler) OnReceived(message *rtmp.Message) {
 	switch message.Type {
 	case rtmp.VIDEO_TYPE:
 		if flvFile != nil {
@@ -61,7 +61,7 @@ func (handler *TestOutboundConnHandler) Received(message *rtmp.Message) {
 	}
 }
 
-func (handler *TestOutboundConnHandler) ReceivedCommand(command *rtmp.Command) {
+func (handler *TestOutboundConnHandler) OnReceivedCommand(command *rtmp.Command) {
 	fmt.Printf("ReceviedCommand: %+v\n", command)
 }
 
@@ -243,9 +243,9 @@ func TryHandshakeByVLC() net.Conn {
 	_, err = io.ReadAtLeast(ibr, c2, rtmp.RTMP_SIG_SIZE)
 
 	// Check S2
-	server_pos := rtmp.ValidateDigest(s1, 8)
+	server_pos := rtmp.ValidateDigest(s1, 8, rtmp.GENUINE_FP_KEY[:30])
 	if server_pos == 0 {
-		server_pos = rtmp.ValidateDigest(s1, 772)
+		server_pos = rtmp.ValidateDigest(s1, 772, rtmp.GENUINE_FP_KEY[:30])
 		if server_pos == 0 {
 			fmt.Println("P<<<S: S1 position check error")
 			os.Exit(-1)
@@ -308,9 +308,9 @@ func CheckC1(c1 []byte, offset1 bool) (uint32, error) {
 }
 
 func CheckC2(s1, c2 []byte) (uint32, error) {
-	server_pos := rtmp.ValidateDigest(s1, 8)
+	server_pos := rtmp.ValidateDigest(s1, 8, rtmp.GENUINE_FMS_KEY[:36])
 	if server_pos == 0 {
-		server_pos = rtmp.ValidateDigest(s1, 772)
+		server_pos = rtmp.ValidateDigest(s1, 772, rtmp.GENUINE_FMS_KEY[:36])
 		if server_pos == 0 {
 			return 0, errors.New("Server response validating failed")
 		}

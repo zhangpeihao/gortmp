@@ -33,12 +33,16 @@ func NewServer(network string, bindAddress string, handler ServerHandler) (*Serv
 	if err != nil {
 		return nil, err
 	}
+	logger.ModulePrintln(logHandler, log.LOG_LEVEL_DEBUG,
+		"Start listen...")
 	go server.mainLoop()
 	return server, nil
 }
 
 // Close listener.
 func (server *Server) Close() {
+	logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE,
+		"Stop server")
 	server.exit = true
 	server.listener.Close()
 }
@@ -77,6 +81,8 @@ func (server *Server) Handshake(c net.Conn) {
 				"Server::Handshake panic error:", err)
 		}
 	}()
+	logger.ModulePrintln(logHandler, log.LOG_LEVEL_DEBUG,
+		"Handshake begin")
 	br := bufio.NewReader(c)
 	bw := bufio.NewWriter(c)
 	timeout := time.Duration(10) * time.Second

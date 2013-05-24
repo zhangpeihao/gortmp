@@ -3,6 +3,8 @@
 package rtmp
 
 import (
+	"bytes"
+	"fmt"
 	"github.com/zhangpeihao/goamf"
 	"github.com/zhangpeihao/log"
 )
@@ -20,7 +22,8 @@ type InboundStreamHandler interface {
 // messages.
 type inboundStream struct {
 	id            uint32
-	conn          InboundConn
+	streamName    string
+	conn          *inboundConn
 	chunkStreamID uint32
 	handler       InboundStreamHandler
 	bufferLength  uint32
@@ -30,6 +33,8 @@ type inboundStream struct {
 type InboundStream interface {
 	// ID
 	ID() uint32
+	// StreamName
+	StreamName() string
 	// Close
 	Close()
 	// Received messages
@@ -47,6 +52,11 @@ type InboundStream interface {
 // ID
 func (stream *inboundStream) ID() uint32 {
 	return stream.id
+}
+
+// ID
+func (stream *inboundStream) StreamName() string {
+	return stream.streamName
 }
 
 // Close
@@ -118,6 +128,8 @@ func (stream *inboundStream) Received(message *Message) bool {
 			return stream.onRecevieAudio(cmd)
 		case "recevieVideo":
 			return stream.onRecevieVideo(cmd)
+		case "closeStream":
+			return stream.onCloseStream(cmd)
 		default:
 			logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE, "inboundStream::Received: %+v\n", cmd)
 		}
@@ -152,6 +164,27 @@ func (stream *inboundStream) SendData(dataType uint8, data []byte, deltaTimestam
 }
 
 func (stream *inboundStream) onPlay(cmd *Command) bool {
+	// Get stream name
+	if cmd.Objects == nil || len(cmd.Objects) < 2 || cmd.Objects[1] == nil {
+		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
+			"inboundStream::onPlay: command error 1! %+v\n", cmd)
+		return true
+	}
+
+	if streamName, ok := cmd.Objects[1].(string); !ok {
+		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
+			"inboundStream::onPlay: command error 2! %+v\n", cmd)
+		return true
+	} else {
+		stream.streamName = streamName
+	}
+	// Response
+	stream.conn.conn.SetChunkSize(4096)
+	stream.conn.conn.SendUserControlMessage(EVENT_STREAM_BEGIN)
+	stream.streamReset()
+	stream.streamStart()
+	stream.rtmpSampleAccess()
+	stream.handler.OnPlayStart(stream)
 	return true
 }
 
@@ -163,4 +196,72 @@ func (stream *inboundStream) onRecevieAudio(cmd *Command) bool {
 }
 func (stream *inboundStream) onRecevieVideo(cmd *Command) bool {
 	return true
+}
+func (stream *inboundStream) onCloseStream(cmd *Command) bool {
+	return true
+}
+
+func (stream *inboundStream) streamReset() {
+	cmd := &Command{
+		IsFlex:        false,
+		Name:          "onStatus",
+		TransactionID: 0,
+		Objects:       make([]interface{}, 2),
+	}
+	cmd.Objects[0] = nil
+	cmd.Objects[1] = amf.Object{
+		"level":       "status",
+		"code":        NETSTREAM_PLAY_RESET,
+		"description": fmt.Sprintf("playing and resetting %s", stream.streamName),
+		"details":     stream.streamName,
+	}
+	buf := new(bytes.Buffer)
+	err := cmd.Write(buf)
+	CheckError(err, "inboundStream::streamReset() Create command")
+
+	message := &Message{
+		ChunkStreamID: CS_ID_USER_CONTROL,
+		Type:          COMMAND_AMF0,
+		Size:          uint32(buf.Len()),
+		Buf:           buf,
+	}
+	message.Dump("streamReset")
+	stream.conn.conn.Send(message)
+}
+
+func (stream *inboundStream) streamStart() {
+	cmd := &Command{
+		IsFlex:        false,
+		Name:          "onStatus",
+		TransactionID: 0,
+		Objects:       make([]interface{}, 2),
+	}
+	cmd.Objects[0] = nil
+	cmd.Objects[1] = amf.Object{
+		"level":       "status",
+		"code":        NETSTREAM_PLAY_START,
+		"description": fmt.Sprintf("Started playing %s", stream.streamName),
+		"details":     stream.streamName,
+	}
+	buf := new(bytes.Buffer)
+	err := cmd.Write(buf)
+	CheckError(err, "inboundStream::streamStart() Create command")
+
+	message := &Message{
+		ChunkStreamID: CS_ID_USER_CONTROL,
+		Type:          COMMAND_AMF0,
+		Size:          uint32(buf.Len()),
+		Buf:           buf,
+	}
+	message.Dump("streamStart")
+	stream.conn.conn.Send(message)
+}
+
+func (stream *inboundStream) rtmpSampleAccess() {
+	message := NewMessage(CS_ID_USER_CONTROL, DATA_AMF0, 0, 0, nil)
+	amf.WriteString(message.Buf, "|RtmpSampleAccess")
+	amf.WriteBoolean(message.Buf, false)
+	amf.WriteBoolean(message.Buf, false)
+	message.Dump("rtmpSampleAccess")
+	stream.conn.conn.Send(message)
 }

@@ -38,14 +38,14 @@ func (handler *TestOutboundConnHandler) OnStatus() {
 	fmt.Printf("@@@@@@@@@@@@@status: %d, err: %v\n", status, err)
 }
 
-func (handler *TestOutboundConnHandler) Closed() {
+func (handler *TestOutboundConnHandler) OnClosed() {
 	fmt.Printf("@@@@@@@@@@@@@Closed\n")
 }
 
-func (handler *TestOutboundConnHandler) Received(message *rtmp.Message) {
+func (handler *TestOutboundConnHandler) OnReceived(message *rtmp.Message) {
 }
 
-func (handler *TestOutboundConnHandler) ReceivedCommand(command *rtmp.Command) {
+func (handler *TestOutboundConnHandler) OnReceivedCommand(command *rtmp.Command) {
 	fmt.Printf("ReceviedCommand: %+v\n", command)
 }
 

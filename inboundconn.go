@@ -10,6 +10,7 @@ import (
 	"github.com/zhangpeihao/goamf"
 	"github.com/zhangpeihao/log"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -28,9 +29,11 @@ type InboundAuthHandler interface {
 type InboundConnHandler interface {
 	ConnHandler
 	// When connection status changed
-	OnStatus(ibConn InboundConn)
+	OnStatus()
 	// On stream created
-	OnStreamCreated(ibConn InboundConn, stream InboundStream)
+	OnStreamCreated(stream InboundStream)
+	// On stream closed
+	OnStreamClosed(stream InboundStream)
 }
 
 type InboundConn interface {
@@ -45,21 +48,19 @@ type InboundConn interface {
 	Call(customParameters ...interface{}) (err error)
 	// Get network connect instance
 	Conn() Conn
-	// Connect parameters
-	Params() map[string]string
 	// Attach handler
 	Attach(handler InboundConnHandler)
 }
 
 type inboundConn struct {
-	app         string
-	params      map[string]string
-	handler     InboundConnHandler
-	authHandler InboundAuthHandler
-	conn        Conn
-	status      uint
-	err         error
-	streams     map[uint32]InboundStream
+	app           string
+	handler       InboundConnHandler
+	authHandler   InboundAuthHandler
+	conn          Conn
+	status        uint
+	err           error
+	streams       map[uint32]*inboundStream
+	streamsLocker sync.Mutex
 }
 
 func NewInboundConn(c net.Conn, br *bufio.Reader, bw *bufio.Writer,
@@ -67,27 +68,26 @@ func NewInboundConn(c net.Conn, br *bufio.Reader, bw *bufio.Writer,
 	ibConn := &inboundConn{
 		authHandler: authHandler,
 		status:      INBOUND_CONN_STATUS_CLOSE,
-		params:      make(map[string]string),
-		streams:     make(map[uint32]InboundStream),
+		streams:     make(map[uint32]*inboundStream),
 	}
 	ibConn.conn = NewConn(c, br, bw, ibConn, maxChannelNumber)
 	return ibConn, nil
 }
 
 // Callback when recieved message. Audio & Video data
-func (ibConn *inboundConn) Received(message *Message) {
+func (ibConn *inboundConn) OnReceived(message *Message) {
 	stream, found := ibConn.streams[message.StreamID]
 	if found {
 		if !stream.Received(message) {
-			ibConn.handler.Received(message)
+			ibConn.handler.OnReceived(message)
 		}
 	} else {
-		ibConn.handler.Received(message)
+		ibConn.handler.OnReceived(message)
 	}
 }
 
 // Callback when recieved message.
-func (ibConn *inboundConn) ReceivedCommand(command *Command) {
+func (ibConn *inboundConn) OnReceivedCommand(command *Command) {
 	command.Dump()
 	switch command.Name {
 	case "connect":
@@ -101,6 +101,12 @@ func (ibConn *inboundConn) ReceivedCommand(command *Command) {
 	}
 }
 
+// Connection closed
+func (ibConn *inboundConn) OnClosed() {
+	ibConn.status = INBOUND_CONN_STATUS_CLOSE
+	ibConn.handler.OnStatus()
+}
+
 // Close a connection
 func (ibConn *inboundConn) Close() {
 	for _, stream := range ibConn.streams {
@@ -109,12 +115,6 @@ func (ibConn *inboundConn) Close() {
 	time.Sleep(time.Second)
 	ibConn.status = INBOUND_CONN_STATUS_CLOSE
 	ibConn.conn.Close()
-}
-
-// Connection closed
-func (ibConn *inboundConn) Closed() {
-	ibConn.status = INBOUND_CONN_STATUS_CLOSE
-	ibConn.handler.OnStatus(ibConn)
 }
 
 // Send a message
@@ -133,10 +133,6 @@ func (ibConn *inboundConn) Conn() Conn {
 	return ibConn.conn
 }
 
-func (ibConn *inboundConn) Params() map[string]string {
-	return ibConn.params
-}
-
 // Connection status
 func (ibConn *inboundConn) Status() (uint, error) {
 	return ibConn.status, ibConn.err
@@ -144,24 +140,52 @@ func (ibConn *inboundConn) Status() (uint, error) {
 func (ibConn *inboundConn) Attach(handler InboundConnHandler) {
 	ibConn.handler = handler
 }
+
+////////////////////////////////
+// Local functions
+
+func (ibConn *inboundConn) allocStream(stream *inboundStream) uint32 {
+	ibConn.streamsLocker.Lock()
+	i := uint32(1)
+	for {
+		_, found := ibConn.streams[i]
+		if !found {
+			ibConn.streams[i] = stream
+			stream.id = i
+			break
+		}
+		i++
+	}
+	ibConn.streamsLocker.Unlock()
+	return i
+}
+
+func (ibConn *inboundConn) releaseStream(streamID uint32) {
+	ibConn.streamsLocker.Lock()
+	delete(ibConn.streams, streamID)
+	ibConn.streamsLocker.Unlock()
+}
+
 func (ibConn *inboundConn) onConnect(cmd *Command) {
+	logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE,
+		"inboundConn::onConnect")
 	if cmd.Objects == nil {
 		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
 			"inboundConn::onConnect cmd.Object == nil\n")
-		ibConn.SendErrorResult(cmd)
+		ibConn.sendConnectErrorResult(cmd)
 		return
 	}
 	if len(cmd.Objects) == 0 {
 		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
 			"inboundConn::onConnect len(cmd.Object) == 0\n")
-		ibConn.SendErrorResult(cmd)
+		ibConn.sendConnectErrorResult(cmd)
 		return
 	}
 	params, ok := cmd.Objects[0].(amf.Object)
 	if !ok {
 		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
 			"inboundConn::onConnect cmd.Object[0] is not an amd object\n")
-		ibConn.SendErrorResult(cmd)
+		ibConn.sendConnectErrorResult(cmd)
 		return
 	}
 
@@ -170,14 +194,14 @@ func (ibConn *inboundConn) onConnect(cmd *Command) {
 	if !found {
 		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
 			"inboundConn::onConnect no app value in cmd.Object[0]\n")
-		ibConn.SendErrorResult(cmd)
+		ibConn.sendConnectErrorResult(cmd)
 		return
 	}
 	ibConn.app, ok = app.(string)
 	if !ok {
 		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
 			"inboundConn::onConnect cmd.Object[0].app is not a string\n")
-		ibConn.SendErrorResult(cmd)
+		ibConn.sendConnectErrorResult(cmd)
 		return
 	}
 
@@ -185,16 +209,43 @@ func (ibConn *inboundConn) onConnect(cmd *Command) {
 	// Todo: Get other paramters
 	// Todo: Auth by logical
 	if ibConn.authHandler.OnConnectAuth(ibConn, cmd) {
-		ibConn.SendSucceededResult(cmd)
+		ibConn.conn.SetWindowAcknowledgementSize()
+		ibConn.conn.SetPeerBandwidth(2500000, SET_PEER_BANDWIDTH_DYNAMIC)
+		ibConn.conn.SetChunkSize(4096)
+		ibConn.sendConnectSucceededResult(cmd)
 	} else {
-		ibConn.SendErrorResult(cmd)
+		ibConn.sendConnectErrorResult(cmd)
 	}
 }
 
 func (ibConn *inboundConn) onCreateStream(cmd *Command) {
+	logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE,
+		"inboundConn::onCreateStream")
+	// New inbound stream
+	newChunkStream, err := ibConn.conn.CreateMediaChunkStream()
+	if err != nil {
+		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
+			"outboundConn::ReceivedCommand() CreateMediaChunkStream err:", err)
+		return
+	}
+	stream := &inboundStream{
+		conn:          ibConn,
+		chunkStreamID: newChunkStream.ID,
+	}
+	ibConn.allocStream(stream)
+	ibConn.status = INBOUND_CONN_STATUS_CREATE_STREAM_OK
+	ibConn.handler.OnStatus()
+	ibConn.handler.OnStreamCreated(stream)
+	// Response result
+	ibConn.sendCreateStreamSuccessResult(cmd)
 }
 
-func (ibConn *inboundConn) SendSucceededResult(req *Command) {
+func (ibConn *inboundConn) onCloseStream(stream *inboundStream) {
+	ibConn.releaseStream(stream.id)
+	ibConn.handler.OnStreamClosed(stream)
+}
+
+func (ibConn *inboundConn) sendConnectSucceededResult(req *Command) {
 	obj1 := make(amf.Object)
 	obj1["fmsVer"] = fmt.Sprintf("FMS/%s", FMS_VERSION_STRING)
 	obj1["capabilities"] = float64(255)
@@ -202,18 +253,18 @@ func (ibConn *inboundConn) SendSucceededResult(req *Command) {
 	obj2["level"] = "status"
 	obj2["code"] = RESULT_CONNECT_OK
 	obj2["description"] = RESULT_CONNECT_OK_DESC
-	ibConn.SendResult(req, "_result", obj1, obj2)
+	ibConn.sendConnectResult(req, "_result", obj1, obj2)
 }
 
-func (ibConn *inboundConn) SendErrorResult(req *Command) {
+func (ibConn *inboundConn) sendConnectErrorResult(req *Command) {
 	obj2 := make(amf.Object)
 	obj2["level"] = "status"
 	obj2["code"] = RESULT_CONNECT_REJECTED
 	obj2["description"] = RESULT_CONNECT_REJECTED_DESC
-	ibConn.SendResult(req, "_error", nil, obj2)
+	ibConn.sendConnectResult(req, "_error", nil, obj2)
 }
 
-func (ibConn *inboundConn) SendResult(req *Command, name string, obj1, obj2 interface{}) (err error) {
+func (ibConn *inboundConn) sendConnectResult(req *Command, name string, obj1, obj2 interface{}) (err error) {
 	// Create createStream command
 	cmd := &Command{
 		IsFlex:        false,
@@ -225,7 +276,7 @@ func (ibConn *inboundConn) SendResult(req *Command, name string, obj1, obj2 inte
 	cmd.Objects[1] = obj2
 	buf := new(bytes.Buffer)
 	err = cmd.Write(buf)
-	CheckError(err, "inboundConn::SendResult() Create command")
+	CheckError(err, "inboundConn::sendConnectResult() Create command")
 
 	message := &Message{
 		ChunkStreamID: CS_ID_COMMAND,
@@ -233,7 +284,32 @@ func (ibConn *inboundConn) SendResult(req *Command, name string, obj1, obj2 inte
 		Size:          uint32(buf.Len()),
 		Buf:           buf,
 	}
-	message.Dump("SendResult")
+	message.Dump("sendConnectResult")
+	return ibConn.conn.Send(message)
+
+}
+
+func (ibConn *inboundConn) sendCreateStreamSuccessResult(req *Command) (err error) {
+	// Create createStream command
+	cmd := &Command{
+		IsFlex:        false,
+		Name:          "_result",
+		TransactionID: req.TransactionID,
+		Objects:       make([]interface{}, 2),
+	}
+	cmd.Objects[0] = nil
+	cmd.Objects[1] = int32(1)
+	buf := new(bytes.Buffer)
+	err = cmd.Write(buf)
+	CheckError(err, "inboundConn::sendCreateStreamSuccessResult() Create command")
+
+	message := &Message{
+		ChunkStreamID: CS_ID_COMMAND,
+		Type:          COMMAND_AMF0,
+		Size:          uint32(buf.Len()),
+		Buf:           buf,
+	}
+	message.Dump("sendCreateStreamSuccessResult")
 	return ibConn.conn.Send(message)
 
 }

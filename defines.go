@@ -39,6 +39,7 @@ const (
 	RESULT_CONNECT_OK_DESC       = "Connection successed."
 	RESULT_CONNECT_REJECTED_DESC = "[ AccessManager.Reject ] : [ code=400 ] : "
 	NETSTREAM_PLAY_START         = "NetStream.Play.Start"
+	NETSTREAM_PLAY_RESET         = "NetStream.Play.Reset"
 	NETSTREAM_PUBLISH_START      = "NetStream.Publish.Start"
 )
 
@@ -46,6 +47,7 @@ const (
 const (
 	CS_ID_PROTOCOL_CONTROL = uint32(2)
 	CS_ID_COMMAND          = uint32(3)
+	CS_ID_USER_CONTROL     = uint32(4)
 )
 
 // Message type
@@ -285,6 +287,9 @@ const (
 	DEFAULT_VIDEO_CODECS                = float64(252)
 	FMS_CAPBILITIES                     = uint32(255)
 	FMS_MODE                            = uint32(2)
+	SET_PEER_BANDWIDTH_HARD             = byte(0)
+	SET_PEER_BANDWIDTH_SOFT             = byte(1)
+	SET_PEER_BANDWIDTH_DYNAMIC          = byte(2)
 )
 
 type Writer interface {

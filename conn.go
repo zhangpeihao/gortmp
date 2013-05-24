@@ -31,16 +31,19 @@ type Conn interface {
 	OutboundChunkStream(id uint32) (chunkStream *OutboundChunkStream, found bool)
 	InboundChunkStream(id uint32) (chunkStream *InboundChunkStream, found bool)
 	SetWindowAcknowledgementSize()
+	SetPeerBandwidth(peerBandwidth uint32, limitType byte)
+	SetChunkSize(chunkSize uint32)
+	SendUserControlMessage(eventId uint16)
 }
 
 // Connection handler
 type ConnHandler interface {
 	// Received message
-	Received(message *Message)
+	OnReceived(message *Message)
 	// Received command
-	ReceivedCommand(command *Command)
+	OnReceivedCommand(command *Command)
 	// Connection closed
-	Closed()
+	OnClosed()
 }
 
 // conn
@@ -140,6 +143,8 @@ func NewConn(c net.Conn, br *bufio.Reader, bw *bufio.Writer, handler ConnHandler
 	conn.outChunkStreams[CS_ID_PROTOCOL_CONTROL] = NewOutboundChunkStream(CS_ID_PROTOCOL_CONTROL)
 	// Create "Command message chunk stream"
 	conn.outChunkStreams[CS_ID_COMMAND] = NewOutboundChunkStream(CS_ID_COMMAND)
+	// Create "User control chunk stream"
+	conn.outChunkStreams[CS_ID_USER_CONTROL] = NewOutboundChunkStream(CS_ID_USER_CONTROL)
 	go conn.sendLoop()
 	go conn.readLoop()
 	return conn
@@ -185,10 +190,6 @@ func (conn *conn) sendMessage(message *Message) {
 					conn.error(err, "sendMessage copy split buffer 1")
 					return
 				}
-				//				err = FlushToNetwork(conn.bw)
-				//				if err != nil {
-				//					conn.error(err, "sendMessage Flush 1")
-				//				}
 				remain -= conn.outChunkSize
 			} else {
 				_, err = CopyNToNetwork(conn.bw, message.Buf, int64(remain))
@@ -196,10 +197,6 @@ func (conn *conn) sendMessage(message *Message) {
 					conn.error(err, "sendMessage copy split buffer 2")
 					return
 				}
-				//				err = FlushToNetwork(conn.bw)
-				//				if err != nil {
-				//					conn.error(err, "sendMessage Flush 2")
-				//				}
 				break
 			}
 		}
@@ -215,7 +212,9 @@ func (conn *conn) sendMessage(message *Message) {
 		conn.error(err, "sendMessage Flush 3")
 		return
 	}
-	if conn.outChunkSizeTemp != 0 {
+	if message.ChunkStreamID == CS_ID_PROTOCOL_CONTROL &&
+		message.Type == SET_CHUNK_SIZE &&
+		conn.outChunkSizeTemp != 0 {
 		// Set chunk size
 		conn.outChunkSize = conn.outChunkSizeTemp
 		conn.outChunkSizeTemp = 0
@@ -260,18 +259,20 @@ func (conn *conn) sendLoop() {
 
 // read loop
 func (conn *conn) readLoop() {
-	defer func() {
+	/*
+		defer func() {
 
-		if r := recover(); r != nil {
-			if conn.err == nil {
-				conn.err = r.(error)
-				logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-					"readLoop panic:", conn.err)
+			if r := recover(); r != nil {
+				if conn.err == nil {
+					conn.err = r.(error)
+					logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
+						"readLoop panic:", conn.err)
+				}
 			}
-		}
-		conn.Close()
-		conn.handler.Closed()
-	}()
+			conn.Close()
+			conn.handler.OnClosed()
+		}()
+	*/
 	var found bool
 	var chunkstream *InboundChunkStream
 	var remain uint32
@@ -662,10 +663,10 @@ func (conn *conn) received(message *Message) {
 			}
 			conn.invokeCommand(cmd)
 		} else {
-			conn.handler.Received(message)
+			conn.handler.OnReceived(message)
 		}
 	default:
-		conn.handler.Received(message)
+		conn.handler.OnReceived(message)
 	}
 }
 
@@ -855,7 +856,7 @@ func (conn *conn) invokeSetPeerBandwidth(message *Message) {
 }
 
 func (conn *conn) invokeCommand(cmd *Command) {
-	conn.handler.ReceivedCommand(cmd)
+	conn.handler.OnReceivedCommand(cmd)
 	logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE,
 		"invokeCommand()")
 }
@@ -907,5 +908,35 @@ func (conn *conn) SetWindowAcknowledgementSize() {
 		return
 	}
 	message.Size = uint32(message.Buf.Len())
+	conn.Send(message)
+}
+func (conn *conn) SetPeerBandwidth(peerBandwidth uint32, limitType byte) {
+	logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE,
+		"SetPeerBandwidth")
+	// Request window acknowledgement size
+	message := NewMessage(CS_ID_PROTOCOL_CONTROL, SET_PEER_BANDWIDTH, 0, 0, nil)
+	if err := binary.Write(message.Buf, binary.BigEndian, &peerBandwidth); err != nil {
+		logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
+			"SetPeerBandwidth write peerBandwidth err:", err)
+		return
+	}
+	if err := message.Buf.WriteByte(limitType); err != nil {
+		logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
+			"SetPeerBandwidth write limitType err:", err)
+		return
+	}
+	message.Size = uint32(message.Buf.Len())
+	conn.Send(message)
+}
+
+func (conn *conn) SendUserControlMessage(eventId uint16) {
+	logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
+		"SendUserControlMessage")
+	message := NewMessage(CS_ID_PROTOCOL_CONTROL, USER_CONTROL_MESSAGE, 0, 0, nil)
+	if err := binary.Write(message.Buf, binary.BigEndian, &eventId); err != nil {
+		logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
+			"SendUserControlMessage write event type err:", err)
+		return
+	}
 	conn.Send(message)
 }

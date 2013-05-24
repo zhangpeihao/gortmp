@@ -37,9 +37,9 @@ func testC1(c1 []byte, offset1 bool) (uint32, error) {
 }
 
 func checkC2(s1, c2 []byte) (uint32, error) {
-	server_pos := ValidateDigest(s1, 8)
+	server_pos := ValidateDigest(s1, 8, GENUINE_FMS_KEY[:36])
 	if server_pos == 0 {
-		server_pos = ValidateDigest(s1, 772)
+		server_pos = ValidateDigest(s1, 772, GENUINE_FMS_KEY[:36])
 		if server_pos == 0 {
 			return 0, errors.New("Server response validating failed")
 		}
