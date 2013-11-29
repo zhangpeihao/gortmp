@@ -26,9 +26,9 @@ const (
 type OutboundConnHandler interface {
 	ConnHandler
 	// When connection status changed
-	OnStatus()
+	OnStatus(obConn OutboundConn)
 	// On stream created
-	OnStreamCreated(stream OutboundStream)
+	OnStreamCreated(obConn OutboundConn, stream OutboundStream)
 }
 
 type OutboundConn interface {
@@ -44,7 +44,7 @@ type OutboundConn interface {
 	Status() (uint, error)
 	// Send a message
 	Send(message *Message) error
-	// Calls a command or method on Flash Media Server 
+	// Calls a command or method on Flash Media Server
 	// or on an application server running Flash Remoting.
 	Call(customParameters ...interface{}) (err error)
 	// Get network connect instance
@@ -86,7 +86,7 @@ func Dial(url string, handler OutboundConnHandler, maxChannelNumber int) (Outbou
 	}
 	br := bufio.NewReader(c)
 	bw := bufio.NewWriter(c)
-	timeout := time.Duration(10) * time.Second
+	timeout := time.Duration(0)
 	err = Handshake(c, br, bw, timeout)
 	//err = HandshakeSample(c, br, bw, timeout)
 	if err == nil {
@@ -253,19 +253,19 @@ func (obConn *outboundConn) Status() (uint, error) {
 }
 
 // Callback when recieved message. Audio & Video data
-func (obConn *outboundConn) OnReceived(message *Message) {
+func (obConn *outboundConn) OnReceived(conn Conn, message *Message) {
 	stream, found := obConn.streams[message.StreamID]
 	if found {
 		if !stream.Received(message) {
-			obConn.handler.OnReceived(message)
+			obConn.handler.OnReceived(conn, message)
 		}
 	} else {
-		obConn.handler.OnReceived(message)
+		obConn.handler.OnReceived(conn, message)
 	}
 }
 
 // Callback when recieved message.
-func (obConn *outboundConn) OnReceivedCommand(command *Command) {
+func (obConn *outboundConn) OnReceivedCommand(conn Conn, command *Command) {
 	command.Dump()
 	switch command.Name {
 	case "_result":
@@ -282,7 +282,7 @@ func (obConn *outboundConn) OnReceivedCommand(command *Command) {
 							//time.Sleep(time.Duration(200) * time.Millisecond)
 							obConn.conn.SetWindowAcknowledgementSize()
 							obConn.status = OUTBOUND_CONN_STATUS_CONNECT_OK
-							obConn.handler.OnStatus()
+							obConn.handler.OnStatus(obConn)
 							obConn.status = OUTBOUND_CONN_STATUS_CREATE_STREAM
 							obConn.CreateStream()
 						}
@@ -305,8 +305,8 @@ func (obConn *outboundConn) OnReceivedCommand(command *Command) {
 						}
 						obConn.streams[stream.ID()] = stream
 						obConn.status = OUTBOUND_CONN_STATUS_CREATE_STREAM_OK
-						obConn.handler.OnStatus()
-						obConn.handler.OnStreamCreated(stream)
+						obConn.handler.OnStatus(obConn)
+						obConn.handler.OnStreamCreated(obConn, stream)
 					}
 				}
 			}
@@ -326,9 +326,9 @@ func (obConn *outboundConn) OnReceivedCommand(command *Command) {
 }
 
 // Connection closed
-func (obConn *outboundConn) OnClosed() {
+func (obConn *outboundConn) OnClosed(conn Conn) {
 	obConn.status = OUTBOUND_CONN_STATUS_CLOSE
-	obConn.handler.OnStatus()
+	obConn.handler.OnStatus(obConn)
 }
 
 // Create a stream
@@ -370,7 +370,7 @@ func (obConn *outboundConn) Send(message *Message) error {
 	return obConn.conn.Send(message)
 }
 
-// Calls a command or method on Flash Media Server 
+// Calls a command or method on Flash Media Server
 // or on an application server running Flash Remoting.
 func (obConn *outboundConn) Call(customParameters ...interface{}) (err error) {
 	return errors.New("Unimplemented")

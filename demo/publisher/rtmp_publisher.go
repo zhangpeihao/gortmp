@@ -32,24 +32,24 @@ var flvFile *flv.File
 
 var status uint
 
-func (handler *TestOutboundConnHandler) OnStatus() {
+func (handler *TestOutboundConnHandler) OnStatus(conn rtmp.OutboundConn) {
 	var err error
 	status, err = obConn.Status()
 	fmt.Printf("@@@@@@@@@@@@@status: %d, err: %v\n", status, err)
 }
 
-func (handler *TestOutboundConnHandler) OnClosed() {
+func (handler *TestOutboundConnHandler) OnClosed(conn rtmp.Conn) {
 	fmt.Printf("@@@@@@@@@@@@@Closed\n")
 }
 
-func (handler *TestOutboundConnHandler) OnReceived(message *rtmp.Message) {
+func (handler *TestOutboundConnHandler) OnReceived(conn rtmp.Conn, message *rtmp.Message) {
 }
 
-func (handler *TestOutboundConnHandler) OnReceivedCommand(command *rtmp.Command) {
+func (handler *TestOutboundConnHandler) OnReceivedCommand(conn rtmp.Conn, command *rtmp.Command) {
 	fmt.Printf("ReceviedCommand: %+v\n", command)
 }
 
-func (handler *TestOutboundConnHandler) OnStreamCreated(stream rtmp.OutboundStream) {
+func (handler *TestOutboundConnHandler) OnStreamCreated(conn rtmp.OutboundConn, stream rtmp.OutboundStream) {
 	fmt.Printf("Stream created: %d\n", stream.ID())
 	createStreamChan <- stream
 }

@@ -31,6 +31,7 @@ type inboundStream struct {
 
 // A RTMP logical stream on connection.
 type InboundStream interface {
+	Conn() InboundConn
 	// ID
 	ID() uint32
 	// StreamName
@@ -49,12 +50,16 @@ type InboundStream interface {
 	SendData(dataType uint8, data []byte, deltaTimestamp uint32) error
 }
 
+func (stream *inboundStream) Conn() InboundConn {
+	return stream.conn
+}
+
 // ID
 func (stream *inboundStream) ID() uint32 {
 	return stream.id
 }
 
-// ID
+// StreamName
 func (stream *inboundStream) StreamName() string {
 	return stream.streamName
 }
@@ -144,21 +149,30 @@ func (stream *inboundStream) Attach(handler InboundStreamHandler) {
 
 // Send audio data
 func (stream *inboundStream) SendAudioData(data []byte, deltaTimestamp uint32) (err error) {
-	message := NewMessage(stream.chunkStreamID, AUDIO_TYPE, stream.id, AUTO_TIMESTAMP, data)
+	message := NewMessage(stream.chunkStreamID-4, AUDIO_TYPE, stream.id, AUTO_TIMESTAMP, data)
 	message.Timestamp = deltaTimestamp
 	return stream.conn.Send(message)
 }
 
 // Send video data
 func (stream *inboundStream) SendVideoData(data []byte, deltaTimestamp uint32) (err error) {
-	message := NewMessage(stream.chunkStreamID, VIDEO_TYPE, stream.id, AUTO_TIMESTAMP, data)
+	message := NewMessage(stream.chunkStreamID-4, VIDEO_TYPE, stream.id, AUTO_TIMESTAMP, data)
 	message.Timestamp = deltaTimestamp
 	return stream.conn.Send(message)
 }
 
 // Send data
 func (stream *inboundStream) SendData(dataType uint8, data []byte, deltaTimestamp uint32) (err error) {
-	message := NewMessage(stream.chunkStreamID, dataType, stream.id, AUTO_TIMESTAMP, data)
+	var csid uint32
+	switch dataType {
+	case VIDEO_TYPE:
+		csid = stream.chunkStreamID - 4
+	case AUDIO_TYPE:
+		csid = stream.chunkStreamID - 4
+	default:
+		csid = stream.chunkStreamID
+	}
+	message := NewMessage(csid, dataType, stream.id, AUTO_TIMESTAMP, data)
 	message.Timestamp = deltaTimestamp
 	return stream.conn.Send(message)
 }

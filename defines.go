@@ -193,7 +193,7 @@ const (
 	// peer. The message type value of 9 is reserved for video messages.
 	// These messages are large and can delay the sending of other type of
 	// messages. To avoid such a situation, the video message is assigned
-	// the lowest priority.	
+	// the lowest priority.
 	VIDEO_TYPE = uint8(9)
 
 	// Aggregate message
@@ -214,7 +214,7 @@ const (
 	SHARED_OBJECT_AMF3 = uint8(16)
 
 	// Data message
-	// 
+	//
 	// The client or the server sends this message to send Metadata or any
 	// user data to the peer. Metadata includes details about the
 	// data(audio, video etc.) like creation time, duration, theme and so
@@ -328,27 +328,26 @@ func CheckError(err error, name string) {
 
 // Parse url
 //
-// To connect to Flash Media Server, pass the URI of the application on the server. 
+// To connect to Flash Media Server, pass the URI of the application on the server.
 // Use the following syntax (items in brackets are optional):
 //
 // protocol://host[:port]/[appname[/instanceName]]
 func ParseURL(url string) (rtmpURL RtmpURL, err error) {
-	s1 := strings.SplitN(url, ":", 3)
+	s1 := strings.SplitN(url, "://", 2)
+	if len(s1) != 2 {
+		err = errors.New(fmt.Sprintf("Parse url %s error. url invalid.", url))
+		return
+	}
 	rtmpURL.protocol = strings.ToLower(s1[0])
-	if len(s1) == 3 {
-		if strings.HasPrefix(s1[1], "//") && len(s1[1]) > 2 {
-			rtmpURL.host = s1[1][2:]
-			if len(rtmpURL.host) == 0 {
-				err = errors.New(fmt.Sprintf("Parse url %s error. Host is empty.", url))
-				return
-			}
-		} else {
-			err = errors.New(fmt.Sprintf("Parse url %s error. Host invalid.", url))
-			return
-		}
-		s2 := strings.SplitN(s1[2], "/", 3)
+	s1 = strings.SplitN(s1[1], "/", 2)
+	if len(s1) != 2 {
+		err = errors.New(fmt.Sprintf("Parse url %s error. no app!", url))
+		return
+	}
+	s2 := strings.SplitN(s1[0], ":", 2)
+	if len(s2) == 2 {
 		var port int
-		port, err = strconv.Atoi(s2[0])
+		port, err = strconv.Atoi(s2[1])
 		if err != nil {
 			err = errors.New(fmt.Sprintf("Parse url %s error. port error: %s.", url, err.Error()))
 			return
@@ -358,26 +357,46 @@ func ParseURL(url string) (rtmpURL RtmpURL, err error) {
 			return
 		}
 		rtmpURL.port = uint16(port)
-		if len(s2) > 1 {
-			rtmpURL.app = s2[1]
-		}
-		if len(s2) > 2 {
-			rtmpURL.instanceName = s2[2]
-		}
 	} else {
-		if len(s1) < 2 {
-			err = errors.New(fmt.Sprintf("Parse url %s error. url invalid.", url))
-			return
-		}
-		// Default port
 		rtmpURL.port = 1935
-		if strings.HasPrefix(s1[1], "//") && len(s1[1]) > 2 {
-			s2 := strings.SplitN(s1[1][2:], "/", 3)
-			rtmpURL.host = s2[0]
-			if len(rtmpURL.host) == 0 {
-				err = errors.New(fmt.Sprintf("Parse url %s error. Host is empty.", url))
+	}
+	if len(s2[0]) == 0 {
+		err = errors.New(fmt.Sprintf("Parse url %s error. host is empty.", url))
+		return
+	}
+	rtmpURL.host = s2[0]
+
+	s2 = strings.SplitN(s1[1], "/", 2)
+	rtmpURL.app = s2[0]
+	if len(s2) == 2 {
+		rtmpURL.instanceName = s2[1]
+	}
+	return
+	/*
+		if len(s1) == 3 {
+			if strings.HasPrefix(s1[1], "//") && len(s1[1]) > 2 {
+				rtmpURL.host = s1[1][2:]
+				if len(rtmpURL.host) == 0 {
+					err = errors.New(fmt.Sprintf("Parse url %s error. Host is empty.", url))
+					return
+				}
+			} else {
+				err = errors.New(fmt.Sprintf("Parse url %s error. Host invalid.", url))
 				return
 			}
+			fmt.Printf("s1: %v\n", s1)
+			s2 := strings.SplitN(s1[2], "/", 3)
+			var port int
+			port, err = strconv.Atoi(s2[0])
+			if err != nil {
+				err = errors.New(fmt.Sprintf("Parse url %s error. port error: %s.", url, err.Error()))
+				return
+			}
+			if port > 65535 || port <= 0 {
+				err = errors.New(fmt.Sprintf("Parse url %s error. port error: %d.", url, port))
+				return
+			}
+			rtmpURL.port = uint16(port)
 			if len(s2) > 1 {
 				rtmpURL.app = s2[1]
 			}
@@ -385,11 +404,32 @@ func ParseURL(url string) (rtmpURL RtmpURL, err error) {
 				rtmpURL.instanceName = s2[2]
 			}
 		} else {
-			err = errors.New(fmt.Sprintf("Parse url %s error. Host invalid.", url))
-			return
+			if len(s1) < 2 {
+				err = errors.New(fmt.Sprintf("Parse url %s error. url invalid.", url))
+				return
+			}
+			// Default port
+			rtmpURL.port = 1935
+			if strings.HasPrefix(s1[1], "//") && len(s1[1]) > 2 {
+				s2 := strings.SplitN(s1[1][2:], "/", 3)
+				rtmpURL.host = s2[0]
+				if len(rtmpURL.host) == 0 {
+					err = errors.New(fmt.Sprintf("Parse url %s error. Host is empty.", url))
+					return
+				}
+				if len(s2) > 1 {
+					rtmpURL.app = s2[1]
+				}
+				if len(s2) > 2 {
+					rtmpURL.instanceName = s2[2]
+				}
+			} else {
+				err = errors.New(fmt.Sprintf("Parse url %s error. Host invalid.", url))
+				return
+			}
 		}
-	}
-	return
+		return
+	*/
 }
 
 func (rtmpUrl *RtmpURL) App() string {
@@ -444,7 +484,7 @@ func ReadByteFromNetwork(r Reader) (b byte, err error) {
 		if retry < 16 {
 			retry = retry * 2
 		}
-		time.Sleep(time.Duration(retry*500) * time.Millisecond)
+		time.Sleep(time.Duration(retry*100) * time.Millisecond)
 	}
 	return
 }
@@ -469,7 +509,7 @@ func ReadAtLeastFromNetwork(r Reader, buf []byte, min int) (n int, err error) {
 		if retry < 16 {
 			retry = retry * 2
 		}
-		time.Sleep(time.Duration(retry*500) * time.Millisecond)
+		time.Sleep(time.Duration(retry*100) * time.Millisecond)
 	}
 	return
 }

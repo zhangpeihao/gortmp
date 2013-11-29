@@ -29,11 +29,11 @@ type InboundAuthHandler interface {
 type InboundConnHandler interface {
 	ConnHandler
 	// When connection status changed
-	OnStatus()
+	OnStatus(ibConn InboundConn)
 	// On stream created
-	OnStreamCreated(stream InboundStream)
+	OnStreamCreated(ibConn InboundConn, stream InboundStream)
 	// On stream closed
-	OnStreamClosed(stream InboundStream)
+	OnStreamClosed(ibConn InboundConn, stream InboundStream)
 }
 
 type InboundConn interface {
@@ -43,16 +43,19 @@ type InboundConn interface {
 	Status() (uint, error)
 	// Send a message
 	Send(message *Message) error
-	// Calls a command or method on Flash Media Server 
+	// Calls a command or method on Flash Media Server
 	// or on an application server running Flash Remoting.
 	Call(customParameters ...interface{}) (err error)
 	// Get network connect instance
 	Conn() Conn
 	// Attach handler
 	Attach(handler InboundConnHandler)
+	// Get connect request
+	ConnectRequest() *Command
 }
 
 type inboundConn struct {
+	connectReq    *Command
 	app           string
 	handler       InboundConnHandler
 	authHandler   InboundAuthHandler
@@ -75,19 +78,19 @@ func NewInboundConn(c net.Conn, br *bufio.Reader, bw *bufio.Writer,
 }
 
 // Callback when recieved message. Audio & Video data
-func (ibConn *inboundConn) OnReceived(message *Message) {
+func (ibConn *inboundConn) OnReceived(conn Conn, message *Message) {
 	stream, found := ibConn.streams[message.StreamID]
 	if found {
 		if !stream.Received(message) {
-			ibConn.handler.OnReceived(message)
+			ibConn.handler.OnReceived(ibConn.conn, message)
 		}
 	} else {
-		ibConn.handler.OnReceived(message)
+		ibConn.handler.OnReceived(ibConn.conn, message)
 	}
 }
 
 // Callback when recieved message.
-func (ibConn *inboundConn) OnReceivedCommand(command *Command) {
+func (ibConn *inboundConn) OnReceivedCommand(conn Conn, command *Command) {
 	command.Dump()
 	switch command.Name {
 	case "connect":
@@ -102,9 +105,9 @@ func (ibConn *inboundConn) OnReceivedCommand(command *Command) {
 }
 
 // Connection closed
-func (ibConn *inboundConn) OnClosed() {
+func (ibConn *inboundConn) OnClosed(conn Conn) {
 	ibConn.status = INBOUND_CONN_STATUS_CLOSE
-	ibConn.handler.OnStatus()
+	ibConn.handler.OnStatus(ibConn)
 }
 
 // Close a connection
@@ -122,7 +125,7 @@ func (ibConn *inboundConn) Send(message *Message) error {
 	return ibConn.conn.Send(message)
 }
 
-// Calls a command or method on Flash Media Server 
+// Calls a command or method on Flash Media Server
 // or on an application server running Flash Remoting.
 func (ibConn *inboundConn) Call(customParameters ...interface{}) (err error) {
 	return errors.New("Unimplemented")
@@ -169,6 +172,7 @@ func (ibConn *inboundConn) releaseStream(streamID uint32) {
 func (ibConn *inboundConn) onConnect(cmd *Command) {
 	logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE,
 		"inboundConn::onConnect")
+	ibConn.connectReq = cmd
 	if cmd.Objects == nil {
 		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
 			"inboundConn::onConnect cmd.Object == nil\n")
@@ -234,15 +238,15 @@ func (ibConn *inboundConn) onCreateStream(cmd *Command) {
 	}
 	ibConn.allocStream(stream)
 	ibConn.status = INBOUND_CONN_STATUS_CREATE_STREAM_OK
-	ibConn.handler.OnStatus()
-	ibConn.handler.OnStreamCreated(stream)
+	ibConn.handler.OnStatus(ibConn)
+	ibConn.handler.OnStreamCreated(ibConn, stream)
 	// Response result
 	ibConn.sendCreateStreamSuccessResult(cmd)
 }
 
 func (ibConn *inboundConn) onCloseStream(stream *inboundStream) {
 	ibConn.releaseStream(stream.id)
-	ibConn.handler.OnStreamClosed(stream)
+	ibConn.handler.OnStreamClosed(ibConn, stream)
 }
 
 func (ibConn *inboundConn) sendConnectSucceededResult(req *Command) {
@@ -312,4 +316,8 @@ func (ibConn *inboundConn) sendCreateStreamSuccessResult(req *Command) (err erro
 	message.Dump("sendCreateStreamSuccessResult")
 	return ibConn.conn.Send(message)
 
+}
+
+func (ibConn *inboundConn) ConnectRequest() *Command {
+	return ibConn.connectReq
 }

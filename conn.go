@@ -39,11 +39,11 @@ type Conn interface {
 // Connection handler
 type ConnHandler interface {
 	// Received message
-	OnReceived(message *Message)
+	OnReceived(conn Conn, message *Message)
 	// Received command
-	OnReceivedCommand(command *Command)
+	OnReceivedCommand(conn Conn, command *Command)
 	// Connection closed
-	OnClosed()
+	OnClosed(conn Conn)
 }
 
 // conn
@@ -259,20 +259,20 @@ func (conn *conn) sendLoop() {
 
 // read loop
 func (conn *conn) readLoop() {
-	/*
-		defer func() {
 
-			if r := recover(); r != nil {
-				if conn.err == nil {
-					conn.err = r.(error)
-					logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-						"readLoop panic:", conn.err)
-				}
+	defer func() {
+
+		if r := recover(); r != nil {
+			if conn.err == nil {
+				conn.err = r.(error)
+				logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
+					"readLoop panic:", conn.err)
 			}
-			conn.Close()
-			conn.handler.OnClosed()
-		}()
-	*/
+		}
+		conn.Close()
+		conn.handler.OnClosed(conn)
+	}()
+
 	var found bool
 	var chunkstream *InboundChunkStream
 	var remain uint32
@@ -337,7 +337,7 @@ func (conn *conn) readLoop() {
 				header.MessageTypeID = chunkstream.lastHeader.MessageTypeID
 				header.Timestamp = chunkstream.lastHeader.Timestamp
 			}
-			absoluteTimestamp = chunkstream.lastInAbsoluteTimestamp + chunkstream.lastHeader.Timestamp
+			absoluteTimestamp = chunkstream.lastInAbsoluteTimestamp
 		}
 		if message == nil {
 			// New message
@@ -571,9 +571,10 @@ func (conn *conn) received(message *Message) {
 			}
 
 			subMessage := NewMessage(message.ChunkStreamID, subType, message.StreamID, 0, nil)
-			subMessage.Timestamp = timestamp - firstAggregateTimestamp
+			subMessage.Timestamp = 0
 			subMessage.IsInbound = true
-			subMessage.AbsoluteTimestamp = subMessage.Timestamp + message.AbsoluteTimestamp
+			subMessage.Size = dataSize
+			subMessage.AbsoluteTimestamp = message.AbsoluteTimestamp
 			// Data
 			_, err = io.CopyN(subMessage.Buf, message.Buf, int64(dataSize))
 			if err != nil {
@@ -598,75 +599,76 @@ func (conn *conn) received(message *Message) {
 				break
 			}
 		}
-	}
-	switch message.ChunkStreamID {
-	case CS_ID_PROTOCOL_CONTROL:
-		switch message.Type {
-		case SET_CHUNK_SIZE:
-			conn.invokeSetChunkSize(message)
-		case ABORT_MESSAGE:
-			conn.invokeAbortMessage(message)
-		case ACKNOWLEDGEMENT:
-			conn.invokeAcknowledgement(message)
-		case USER_CONTROL_MESSAGE:
-			conn.invokeUserControlMessage(message)
-		case WINDOW_ACKNOWLEDGEMENT_SIZE:
-			conn.invokeWindowAcknowledgementSize(message)
-		case SET_PEER_BANDWIDTH:
-			conn.invokeSetPeerBandwidth(message)
-		default:
-			logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-				"Unkown message type %d in Protocol control chunk stream!\n", message.Type)
-		}
-	case CS_ID_COMMAND:
-		if message.StreamID == 0 {
-			cmd := &Command{}
-			var err error
-			var transactionID float64
-			var object interface{}
+	} else {
+		switch message.ChunkStreamID {
+		case CS_ID_PROTOCOL_CONTROL:
 			switch message.Type {
-			case COMMAND_AMF3:
-				cmd.IsFlex = true
-				_, err = message.Buf.ReadByte()
-				if err != nil {
-					logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-						"Read first in flex commad err:", err)
-					return
-				}
-				fallthrough
-			case COMMAND_AMF0:
-				cmd.Name, err = amf.ReadString(message.Buf)
-				if err != nil {
-					logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-						"AMF0 Read name err:", err)
-					return
-				}
-				transactionID, err = amf.ReadDouble(message.Buf)
-				if err != nil {
-					logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-						"AMF0 Read transactionID err:", err)
-					return
-				}
-				cmd.TransactionID = uint32(transactionID)
-				for message.Buf.Len() > 0 {
-					object, err = amf.ReadValue(message.Buf)
-					if err != nil {
-						logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-							"AMF0 Read object err:", err)
-						return
-					}
-					cmd.Objects = append(cmd.Objects, object)
-				}
+			case SET_CHUNK_SIZE:
+				conn.invokeSetChunkSize(message)
+			case ABORT_MESSAGE:
+				conn.invokeAbortMessage(message)
+			case ACKNOWLEDGEMENT:
+				conn.invokeAcknowledgement(message)
+			case USER_CONTROL_MESSAGE:
+				conn.invokeUserControlMessage(message)
+			case WINDOW_ACKNOWLEDGEMENT_SIZE:
+				conn.invokeWindowAcknowledgementSize(message)
+			case SET_PEER_BANDWIDTH:
+				conn.invokeSetPeerBandwidth(message)
 			default:
 				logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-					"Unkown message type %d in Command chunk stream!\n", message.Type)
+					"Unkown message type %d in Protocol control chunk stream!\n", message.Type)
 			}
-			conn.invokeCommand(cmd)
-		} else {
-			conn.handler.OnReceived(message)
+		case CS_ID_COMMAND:
+			if message.StreamID == 0 {
+				cmd := &Command{}
+				var err error
+				var transactionID float64
+				var object interface{}
+				switch message.Type {
+				case COMMAND_AMF3:
+					cmd.IsFlex = true
+					_, err = message.Buf.ReadByte()
+					if err != nil {
+						logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
+							"Read first in flex commad err:", err)
+						return
+					}
+					fallthrough
+				case COMMAND_AMF0:
+					cmd.Name, err = amf.ReadString(message.Buf)
+					if err != nil {
+						logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
+							"AMF0 Read name err:", err)
+						return
+					}
+					transactionID, err = amf.ReadDouble(message.Buf)
+					if err != nil {
+						logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
+							"AMF0 Read transactionID err:", err)
+						return
+					}
+					cmd.TransactionID = uint32(transactionID)
+					for message.Buf.Len() > 0 {
+						object, err = amf.ReadValue(message.Buf)
+						if err != nil {
+							logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
+								"AMF0 Read object err:", err)
+							return
+						}
+						cmd.Objects = append(cmd.Objects, object)
+					}
+				default:
+					logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
+						"Unkown message type %d in Command chunk stream!\n", message.Type)
+				}
+				conn.invokeCommand(cmd)
+			} else {
+				conn.handler.OnReceived(conn, message)
+			}
+		default:
+			conn.handler.OnReceived(conn, message)
 		}
-	default:
-		conn.handler.OnReceived(message)
 	}
 }
 
@@ -856,7 +858,7 @@ func (conn *conn) invokeSetPeerBandwidth(message *Message) {
 }
 
 func (conn *conn) invokeCommand(cmd *Command) {
-	conn.handler.OnReceivedCommand(cmd)
+	conn.handler.OnReceivedCommand(conn, cmd)
 	logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE,
 		"invokeCommand()")
 }

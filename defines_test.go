@@ -16,7 +16,6 @@ var testParseURLCase = []TestParseURLCase{
 	{"full", "rtmp://somehost.com:1936/app/instance", RtmpURL{"rtmp", "somehost.com", uint16(1936), "app", "instance"}},
 	{"normal", "rtmp://somehost.com/app/instance", RtmpURL{"rtmp", "somehost.com", uint16(1935), "app", "instance"}},
 	{"without instance", "rtmp://somehost.com/app", RtmpURL{"rtmp", "somehost.com", uint16(1935), "app", ""}},
-	{"without app & instance", "rtmp://somehost.com", RtmpURL{"rtmp", "somehost.com", uint16(1935), "", ""}},
 }
 
 type TestParseURLErrorCase struct {
@@ -25,6 +24,7 @@ type TestParseURLErrorCase struct {
 }
 
 var testParseURLErrorCase = []TestParseURLErrorCase{
+	{"without app & instance", "rtmp://somehost.com"},
 	{"no protocol", "somehost.com:1936/app/instance"},
 	{"no host", "rtmp://:1936/app/instance"},
 	{"no host and port", "rtmp:///app/instance"},

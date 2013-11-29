@@ -352,15 +352,16 @@ func SHandshake(c net.Conn, br *bufio.Reader, bw *bufio.Writer, timeout time.Dur
 	// Send S2
 	_, err = bw.Write(s2)
 	CheckError(err, "SHandshake() Send S2")
+
 	if timeout > 0 {
-		c.SetWriteDeadline(time.Now().Add(timeout))
+		//		c.SetWriteDeadline(time.Now().Add(timeout))
 	}
 	err = bw.Flush()
 	CheckError(err, "SHandshake() Flush S2")
 
 	// Read C2
 	if timeout > 0 {
-		c.SetReadDeadline(time.Now().Add(timeout))
+		//		c.SetReadDeadline(time.Now().Add(timeout))
 	}
 	c2 := make([]byte, RTMP_SIG_SIZE)
 	_, err = io.ReadAtLeast(br, c2, RTMP_SIG_SIZE)
