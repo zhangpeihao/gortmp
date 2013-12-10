@@ -237,7 +237,7 @@ func (obConn *outboundConn) Close() {
 	for _, stream := range obConn.streams {
 		stream.Close()
 	}
-	time.Sleep(time.Second)
+	//	time.Sleep(time.Second)
 	obConn.status = OUTBOUND_CONN_STATUS_CLOSE
 	obConn.conn.Close()
 }
@@ -323,6 +323,7 @@ func (obConn *outboundConn) OnReceivedCommand(conn Conn, command *Command) {
 		}
 	case "onBWCheck":
 	}
+	obConn.handler.OnReceivedCommand(obConn.conn, command)
 }
 
 // Connection closed

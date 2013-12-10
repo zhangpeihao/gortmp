@@ -207,21 +207,21 @@ func (stream *outboundStream) Received(message *Message) bool {
 			cmd.IsFlex = true
 			_, err = message.Buf.ReadByte()
 			if err != nil {
-				logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
+				logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
 					"outboundStream::Received() Read first in flex commad err:", err)
 				return true
 			}
 		}
 		cmd.Name, err = amf.ReadString(message.Buf)
 		if err != nil {
-			logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
+			logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
 				"outboundStream::Received() AMF0 Read name err:", err)
 			return true
 		}
 		var transactionID float64
 		transactionID, err = amf.ReadDouble(message.Buf)
 		if err != nil {
-			logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
+			logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
 				"outboundStream::Received() AMF0 Read transactionID err:", err)
 			return true
 		}
@@ -230,7 +230,7 @@ func (stream *outboundStream) Received(message *Message) bool {
 		for message.Buf.Len() > 0 {
 			object, err = amf.ReadValue(message.Buf)
 			if err != nil {
-				logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
+				logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
 					"outboundStream::Received() AMF0 Read object err:", err)
 				return true
 			}
@@ -243,6 +243,9 @@ func (stream *outboundStream) Received(message *Message) bool {
 			return stream.onMetaData(cmd)
 		case "onTimeCoordInfo":
 			return stream.onTimeCoordInfo(cmd)
+		default:
+			logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
+				"outboundStream::Received() Unknown command: %s\n", cmd.Name)
 		}
 	}
 	return false
