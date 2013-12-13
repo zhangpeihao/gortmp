@@ -525,7 +525,11 @@ func CopyNFromNetwork(dst Writer, src Reader, n int64) (written int64, err error
 			l = int(d)
 		}
 		nr, er := ReadAtLeastFromNetwork(src, buf[0:l], l)
-		if nr > 0 {
+		if er != nil {
+			err = er
+			break
+		}
+		if nr == l {
 			nw, ew := dst.Write(buf[0:nr])
 			if nw > 0 {
 				written += int64(nw)
@@ -538,10 +542,8 @@ func CopyNFromNetwork(dst Writer, src Reader, n int64) (written int64, err error
 				err = io.ErrShortWrite
 				break
 			}
-		}
-		if er != nil {
-			err = er
-			break
+		} else {
+			err = io.ErrShortBuffer
 		}
 	}
 	return

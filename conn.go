@@ -281,18 +281,21 @@ func (conn *conn) readLoop() {
 		n, vfmt, csi, err := ReadBaseHeader(conn.br)
 		CheckError(err, "ReadBaseHeader")
 		conn.inBytes += uint32(n)
-		// Read header
-		header := &Header{}
-		n, err = header.ReadHeader(conn.br, vfmt, csi)
-		CheckError(err, "ReadHeader")
-		conn.inBytes += uint32(n)
 		// Get chunk stream
 		chunkstream, found = conn.inChunkStreams[csi]
 		if !found || chunkstream == nil {
-			logger.ModulePrintf(logHandler, log.LOG_LEVEL_DEBUG, "New stream: %d\n", csi)
+			logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE, "New stream 1 csi: %d, fmt: %d\n", csi, vfmt)
 			chunkstream = NewInboundChunkStream(csi)
 			conn.inChunkStreams[csi] = chunkstream
 		}
+		// Read header
+		header := &Header{}
+		n, err = header.ReadHeader(conn.br, vfmt, csi, chunkstream.lastHeader)
+		CheckError(err, "ReadHeader")
+		if !found {
+			logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE, "New stream 2 csi: %d, fmt: %d, header: %+v\n", csi, vfmt, header)
+		}
+		conn.inBytes += uint32(n)
 		var absoluteTimestamp uint32
 		var message *Message
 		switch vfmt {
@@ -305,8 +308,9 @@ func (conn *conn) readLoop() {
 				logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
 					"A new message with fmt: %d, csi: %d\n", vfmt, csi)
 				header.Dump("err")
+			} else {
+				header.MessageStreamID = chunkstream.lastHeader.MessageStreamID
 			}
-			header.MessageStreamID = chunkstream.lastHeader.MessageStreamID
 			chunkstream.lastHeader = header
 			absoluteTimestamp = chunkstream.lastInAbsoluteTimestamp + header.Timestamp
 		case HEADER_FMT_SAME_LENGTH_AND_STREAM:
@@ -330,13 +334,13 @@ func (conn *conn) readLoop() {
 				logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
 					"A new message with fmt: %d, csi: %d\n", vfmt, csi)
 				header.Dump("err")
-				return
 			} else {
 				header.MessageStreamID = chunkstream.lastHeader.MessageStreamID
 				header.MessageLength = chunkstream.lastHeader.MessageLength
 				header.MessageTypeID = chunkstream.lastHeader.MessageTypeID
 				header.Timestamp = chunkstream.lastHeader.Timestamp
 			}
+			chunkstream.lastHeader = header
 			absoluteTimestamp = chunkstream.lastInAbsoluteTimestamp
 		}
 		if message == nil {
@@ -367,6 +371,8 @@ func (conn *conn) readLoop() {
 						break
 					} else {
 						remain -= uint32(n64)
+						logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
+							"Message continue copy remain: %d\n", remain)
 						continue
 					}
 				}
@@ -374,12 +380,17 @@ func (conn *conn) readLoop() {
 				if !ok || !netErr.Temporary() {
 					CheckError(err, "Read data 1")
 				}
+				logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
+					"Message copy blocked!\n")
 			}
 			// Finished message
 			conn.received(message)
 			chunkstream.receivedMessage = nil
 		} else {
 			// Unfinish
+			logger.ModulePrintf(logHandler, log.LOG_LEVEL_DEBUG,
+				"Unfinish message(remain: %d, chunksize: %d)\n", remain, conn.inChunkSize)
+
 			remain = conn.inChunkSize
 			for {
 				// n64, err = CopyNFromNetwork(message.Buf, conn.br, int64(remain))
@@ -390,6 +401,8 @@ func (conn *conn) readLoop() {
 						break
 					} else {
 						remain -= uint32(n64)
+						logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
+							"Unfinish message continue copy remain: %d\n", remain)
 						continue
 					}
 					break
@@ -398,6 +411,8 @@ func (conn *conn) readLoop() {
 				if !ok || !netErr.Temporary() {
 					CheckError(err, "Read data 2")
 				}
+				logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
+					"Unfinish message copy blocked!\n")
 			}
 			chunkstream.receivedMessage = message
 		}
@@ -596,6 +611,8 @@ func (conn *conn) received(message *Message) {
 				}
 				tmpBuf[0] = 0
 			} else {
+				logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
+					"conn::received() AGGREGATE_MESSAGE_TYPE miss previous tag size")
 				break
 			}
 		}

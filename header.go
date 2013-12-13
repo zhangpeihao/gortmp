@@ -41,7 +41,7 @@ type Header struct {
 	Fmt           uint8
 	ChunkStreamID uint32
 
-	// Chunk Message Header	
+	// Chunk Message Header
 	Timestamp       uint32
 	MessageLength   uint32
 	MessageTypeID   uint8
@@ -97,7 +97,7 @@ func ReadBaseHeader(rbuf Reader) (n int, fmt uint8, csi uint32, err error) {
 }
 
 // Read new chunk stream header from io.Reader
-func (header *Header) ReadHeader(rbuf Reader, vfmt uint8, csi uint32) (n int, err error) {
+func (header *Header) ReadHeader(rbuf Reader, vfmt uint8, csi uint32, lastheader *Header) (n int, err error) {
 	header.Fmt = vfmt
 	header.ChunkStreamID = csi
 	var b byte
@@ -107,7 +107,7 @@ func (header *Header) ReadHeader(rbuf Reader, vfmt uint8, csi uint32) (n int, er
 		// Chunks of Type 0 are 11 bytes long. This type MUST be used at the
 		// start of a chunk stream, and whenever the stream timestamp goes
 		// backward (e.g., because of a backward seek).
-		// 
+		//
 		//  0                   1                   2                   3
 		//  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 		// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -219,21 +219,20 @@ func (header *Header) ReadHeader(rbuf Reader, vfmt uint8, csi uint32) (n int, er
 	// present. Type 3 chunks MUST NOT have this field.
 	// !!!!!! crtmpserver set this field in Type 3 !!!!!!
 	// Todo: Test with FMS
-	//if header.Fmt != HEADER_FMT_CONTINUATION {
-	if header.Timestamp >= 0xffffff {
+	if (header.Fmt != HEADER_FMT_CONTINUATION && header.Timestamp >= 0xffffff) ||
+		(header.Fmt == HEADER_FMT_CONTINUATION && lastheader != nil && lastheader.ExtendedTimestamp > 0) {
 		_, err = ReadAtLeastFromNetwork(rbuf, tmpBuf, 4)
 		if err != nil {
 			return
 		}
 		n += 4
 		header.ExtendedTimestamp = binary.BigEndian.Uint32(tmpBuf)
-		logger.ModulePrintf(logHandler, log.LOG_LEVEL_DEBUG,
-			"Extened timestamp: %d, timestamp: %d\n", header.ExtendedTimestamp, header.Timestamp)
+		logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
+			"Extened timestamp: %d, timestamp: %d, fmt: %d\n", header.ExtendedTimestamp, header.Timestamp, header.Fmt)
 		header.Dump("Extended timestamp")
 	} else {
 		header.ExtendedTimestamp = 0
 	}
-	//}
 	return
 }
 

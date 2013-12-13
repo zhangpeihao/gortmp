@@ -188,7 +188,7 @@ func TestReadHeader(t *testing.T) {
 	header := &Header{}
 	for _, c := range testHeaderCases {
 		buf := bytes.NewReader(c.data)
-		n, err := header.ReadHeader(buf, c.header.Fmt, c.header.ChunkStreamID)
+		n, err := header.ReadHeader(buf, c.header.Fmt, c.header.ChunkStreamID, nil)
 		if err != nil {
 			t.Errorf("TestReadHeader(%s)\n\t%v\nerror: %s", c.name, c.header, err.Error())
 			continue

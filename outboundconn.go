@@ -237,9 +237,11 @@ func (obConn *outboundConn) Close() {
 	for _, stream := range obConn.streams {
 		stream.Close()
 	}
-	//	time.Sleep(time.Second)
 	obConn.status = OUTBOUND_CONN_STATUS_CLOSE
-	obConn.conn.Close()
+	go func() {
+		time.Sleep(time.Second)
+		obConn.conn.Close()
+	}()
 }
 
 // URL to connect
@@ -330,6 +332,7 @@ func (obConn *outboundConn) OnReceivedCommand(conn Conn, command *Command) {
 func (obConn *outboundConn) OnClosed(conn Conn) {
 	obConn.status = OUTBOUND_CONN_STATUS_CLOSE
 	obConn.handler.OnStatus(obConn)
+	obConn.handler.OnClosed(conn)
 }
 
 // Create a stream
