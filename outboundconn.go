@@ -267,7 +267,7 @@ func (obConn *outboundConn) OnReceived(conn Conn, message *Message) {
 }
 
 // Callback when recieved message.
-func (obConn *outboundConn) OnReceivedCommand(conn Conn, command *Command) {
+func (obConn *outboundConn) OnReceivedRtmpCommand(conn Conn, command *Command) {
 	command.Dump()
 	switch command.Name {
 	case "_result":
@@ -297,7 +297,7 @@ func (obConn *outboundConn) OnReceivedCommand(conn Conn, command *Command) {
 						newChunkStream, err := obConn.conn.CreateMediaChunkStream()
 						if err != nil {
 							logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-								"outboundConn::ReceivedCommand() CreateMediaChunkStream err:", err)
+								"outboundConn::ReceivedRtmpCommand() CreateMediaChunkStream err:", err)
 							return
 						}
 						stream := &outboundStream{
@@ -325,7 +325,7 @@ func (obConn *outboundConn) OnReceivedCommand(conn Conn, command *Command) {
 		}
 	case "onBWCheck":
 	}
-	obConn.handler.OnReceivedCommand(obConn.conn, command)
+	obConn.handler.OnReceivedRtmpCommand(obConn.conn, command)
 }
 
 // Connection closed

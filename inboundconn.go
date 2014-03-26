@@ -90,7 +90,7 @@ func (ibConn *inboundConn) OnReceived(conn Conn, message *Message) {
 }
 
 // Callback when recieved message.
-func (ibConn *inboundConn) OnReceivedCommand(conn Conn, command *Command) {
+func (ibConn *inboundConn) OnReceivedRtmpCommand(conn Conn, command *Command) {
 	command.Dump()
 	switch command.Name {
 	case "connect":
@@ -100,7 +100,7 @@ func (ibConn *inboundConn) OnReceivedCommand(conn Conn, command *Command) {
 		// Create a new stream
 		ibConn.onCreateStream(command)
 	default:
-		logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE, "inboundConn::ReceivedCommand: %+v\n", command)
+		logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE, "inboundConn::ReceivedRtmpCommand: %+v\n", command)
 	}
 }
 
