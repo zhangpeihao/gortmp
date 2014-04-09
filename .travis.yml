@@ -8,6 +8,7 @@ go:
 install:
  - go get github.com/zhangpeihao/goflv
  - go get github.com/zhangpeihao/goamf
+ - go get github.com/zhangpeihao/log
 
 script:
  - go test -v ./...
