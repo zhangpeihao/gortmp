@@ -45,8 +45,8 @@ func (handler *TestOutboundConnHandler) OnClosed(conn rtmp.Conn) {
 func (handler *TestOutboundConnHandler) OnReceived(conn rtmp.Conn, message *rtmp.Message) {
 }
 
-func (handler *TestOutboundConnHandler) OnReceivedCommand(conn rtmp.Conn, command *rtmp.Command) {
-	fmt.Printf("ReceviedCommand: %+v\n", command)
+func (handler *TestOutboundConnHandler) OnReceivedRtmpCommand(conn rtmp.Conn, command *rtmp.Command) {
+	fmt.Printf("ReceviedRtmpCommand: %+v\n", command)
 }
 
 func (handler *TestOutboundConnHandler) OnStreamCreated(conn rtmp.OutboundConn, stream rtmp.OutboundStream) {

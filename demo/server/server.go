@@ -56,8 +56,8 @@ func (handler *ServerHandler) OnClosed(conn rtmp.Conn) {
 func (handler *ServerHandler) OnReceived(conn rtmp.Conn, message *rtmp.Message) {
 }
 
-func (handler *ServerHandler) OnReceivedCommand(conn rtmp.Conn, command *rtmp.Command) {
-	fmt.Printf("ReceviedCommand: %+v\n", command)
+func (handler *ServerHandler) OnReceivedRtmpCommand(conn rtmp.Conn, command *rtmp.Command) {
+	fmt.Printf("ReceviedRtmpCommand: %+v\n", command)
 }
 
 // Stream handle functions

@@ -1,3 +1,13 @@
 language: go
+go: 
+ - 1.1
+ - 1.2
+ - release
+ - tip
+
+install:
+ - go get github.com/zhangpeihao/goflv
+ - go get github.com/zhangpeihao/goamf
+
 script:
- - curl https://raw.github.com/daaku/go.travis/master/install | sh
+ - go test -v ./...

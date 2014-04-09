@@ -61,7 +61,7 @@ func (handler *TestOutboundConnHandler) OnReceived(conn rtmp.Conn, message *rtmp
 	}
 }
 
-func (handler *TestOutboundConnHandler) OnReceivedCommand(conn rtmp.Conn, command *rtmp.Command) {
+func (handler *TestOutboundConnHandler) OnReceivedRtmpCommand(conn rtmp.Conn, command *rtmp.Command) {
 	fmt.Printf("ReceviedCommand: %+v\n", command)
 }
 

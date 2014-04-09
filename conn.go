@@ -41,7 +41,7 @@ type ConnHandler interface {
 	// Received message
 	OnReceived(conn Conn, message *Message)
 	// Received command
-	OnReceivedCommand(conn Conn, command *Command)
+	OnReceivedRtmpCommand(conn Conn, command *Command)
 	// Connection closed
 	OnClosed(conn Conn)
 }
@@ -877,7 +877,7 @@ func (conn *conn) invokeSetPeerBandwidth(message *Message) {
 func (conn *conn) invokeCommand(cmd *Command) {
 	logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE,
 		"conn::invokeCommand()")
-	conn.handler.OnReceivedCommand(conn, cmd)
+	conn.handler.OnReceivedRtmpCommand(conn, cmd)
 }
 
 func (conn *conn) SetStreamBufferSize(streamId uint32, size uint32) {
