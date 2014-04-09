@@ -149,6 +149,21 @@ var testHeaderCases = []TestHeaderCase{
 		false,
 	},
 	{
+		"Type 3",
+		[]byte{}, // Todo: Test with FMS
+		[]byte{0xc3},
+		Header{
+			Fmt:               0x03,
+			ChunkStreamID:     3,
+			Timestamp:         0x21,
+			MessageLength:     0x12,
+			MessageTypeID:     0x13,
+			MessageStreamID:   0x04,
+			ExtendedTimestamp: 0,
+		},
+		false,
+	},
+	{
 		"Type 2 - with externed timestamp",
 		[]byte{
 			0xff, 0xff, 0xff, // Timestamp
@@ -157,21 +172,6 @@ var testHeaderCases = []TestHeaderCase{
 		[]byte{0x83},
 		Header{
 			Fmt:               0x02,
-			ChunkStreamID:     3,
-			Timestamp:         0xffffff,
-			MessageLength:     0x12,
-			MessageTypeID:     0x13,
-			MessageStreamID:   0x04,
-			ExtendedTimestamp: 0x21000000,
-		},
-		false,
-	},
-	{
-		"Type 3",
-		[]byte{0x21, 0x00, 0x00, 0x00}, // Todo: Test with FMS
-		[]byte{0xc3},
-		Header{
-			Fmt:               0x03,
 			ChunkStreamID:     3,
 			Timestamp:         0xffffff,
 			MessageLength:     0x12,
