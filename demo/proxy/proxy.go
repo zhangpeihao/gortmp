@@ -6,7 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/zhangpeihao/gortmp"
+	rtmp "github.com/zhangpeihao/gortmp"
 	"github.com/zhangpeihao/log"
 	"io"
 	"net"

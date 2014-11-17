@@ -1,4 +1,4 @@
-package rtmp
+package gortmp
 
 var (
 	vlc_s1 = []byte{

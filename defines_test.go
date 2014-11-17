@@ -1,4 +1,4 @@
-package rtmp
+package gortmp
 
 import (
 	"github.com/zhangpeihao/log"

@@ -7,7 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/zhangpeihao/goflv"
-	"github.com/zhangpeihao/gortmp"
+	rtmp "github.com/zhangpeihao/gortmp"
 	"github.com/zhangpeihao/log"
 	"io"
 	"net"
