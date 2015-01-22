@@ -17,7 +17,7 @@ import (
 )
 
 var DefaultObjectEncoding uint = amf.AMF0
-var logger *log.Logger
+var logger *log.Logger = log.NewStderrLogger()
 var logHandler log.LoggerModule
 
 const (
