@@ -18,7 +18,7 @@ import (
 
 var DefaultObjectEncoding uint = amf.AMF0
 var logger *log.Logger = log.NewStderrLogger()
-var logHandler log.LoggerModule
+var logHandler = logger.LoggerModule(RTMP_LOG_NAME)
 
 const (
 	RTMP_LOG_NAME = "rtmp"
@@ -308,6 +308,11 @@ type RtmpURL struct {
 	port         uint16
 	app          string
 	instanceName string
+}
+
+func init() {
+	logger = log.NewStderrLogger()
+	logHandler = logger.LoggerModule(RTMP_LOG_NAME)
 }
 
 // Init log module
