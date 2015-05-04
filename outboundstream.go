@@ -47,6 +47,8 @@ type OutboundStream interface {
 	PublishVideoData(data []byte, deltaTimestamp uint32) error
 	// Publish data
 	PublishData(dataType uint8, data []byte, deltaTimestamp uint32) error
+	// Call
+	Call(name string, customParameters ...interface{}) error
 }
 
 // A publish stream
@@ -144,13 +146,11 @@ func (stream *outboundStream) Publish(streamName, howToPublish string) (err erro
 func (stream *outboundStream) Play(streamName string, start, duration *uint32, reset *bool) (err error) {
 	conn := stream.conn.Conn()
 	// Keng-die: in stream transaction ID always been 0
-	// Get transaction ID
-	transactionID := conn.NewTransactionID()
 	// Create play command
 	cmd := &Command{
 		IsFlex:        false,
 		Name:          "play",
-		TransactionID: transactionID,
+		TransactionID: 0,
 		Objects:       make([]interface{}, 2),
 	}
 	cmd.Objects[0] = nil
@@ -181,6 +181,41 @@ func (stream *outboundStream) Play(streamName string, start, duration *uint32, r
 		return
 	}
 	message.Dump("play")
+
+	err = conn.Send(message)
+	if err != nil {
+		return
+	}
+
+	// Set Buffer Length
+	// Buffer length
+	if stream.bufferLength < MIN_BUFFER_LENGTH {
+		stream.bufferLength = MIN_BUFFER_LENGTH
+	}
+	stream.conn.Conn().SetStreamBufferSize(stream.id, stream.bufferLength)
+	return nil
+}
+
+func (stream *outboundStream) Call(name string, customParameters ...interface{}) (err error) {
+	conn := stream.conn.Conn()
+	// Create play command
+	cmd := &Command{
+		IsFlex:        false,
+		Name:          name,
+		TransactionID: 0,
+		Objects:       make([]interface{}, 1+len(customParameters)),
+	}
+	cmd.Objects[0] = nil
+	for index, param := range customParameters {
+		cmd.Objects[index+1] = param
+	}
+
+	// Construct message
+	message := NewMessage(stream.chunkStreamID, COMMAND_AMF0, stream.id, 0, nil)
+	if err = cmd.Write(message.Buf); err != nil {
+		return
+	}
+	message.Dump(name)
 
 	err = conn.Send(message)
 	if err != nil {
