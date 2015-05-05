@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+const CaCertPath = "/etc/ssl/certs/ca-certificates.crt"
+
 const (
 	OUTBOUND_CONN_STATUS_CLOSE            = uint(0)
 	OUTBOUND_CONN_STATUS_HANDSHAKE_OK     = uint(1)
@@ -72,18 +74,49 @@ func Dial(url string, handler OutboundConnHandler, maxChannelNumber int) (Outbou
 	if err != nil {
 		return nil, err
 	}
-	if rtmpURL.protocol != "rtmp" {
+
+	logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING, "Dial protocol:", rtmpURL.protocol)
+
+	if rtmpURL.protocol != "rtmp" && rtmpURL.protocol != "rtmps" {
 		return nil, errors.New(fmt.Sprintf("Unsupport protocol %s", rtmpURL.protocol))
 	}
-	c, err := net.Dial("tcp", fmt.Sprintf("%s:%d", rtmpURL.host, rtmpURL.port))
-	if err != nil {
-		return nil, err
+
+	var connection net.Conn
+	if rtmpURL.protocol == "rtmp" {
+		connection, err = net.Dial("tcp", fmt.Sprintf("%s:%d", rtmpURL.host, rtmpURL.port))
+
+		ipConn, ok := connection.(*net.TCPConn)
+		if ok {
+			ipConn.SetWriteBuffer(128 * 1024)
+		}
+
+	} else { //rtmps
+
+		rootPEM, _ := ioutil.ReadFile(CaCertPath)
+
+		roots := x509.NewCertPool()
+		ok := roots.AppendCertsFromPEM([]byte(rootPEM))
+		if !ok {
+			panic("failed to parse root certificate")
+		}
+
+		config := tls.Config{RootCAs: roots, InsecureSkipVerify: true}
+		if connection, err = tls.Dial("tcp", fmt.Sprintf("%s:%d", rtmpURL.host, rtmpURL.port), &config); err != nil {
+			log.Println("tls dial error ", err)
+			return nil, err
+		}
+
+		conn, _ := connection.(*tls.Conn)
+		state := conn.ConnectionState()
+		for _, v := range state.PeerCertificates {
+			logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING, x509.MarshalPKIXPublicKey(v.PublicKey))
+			logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING, v.Subject)
+		}
+		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING, "client: handshake: ", state.HandshakeComplete)
+		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING, "client: mutual: ", state.NegotiatedProtocolIsMutual)
+
 	}
 
-	ipConn, ok := c.(*net.TCPConn)
-	if ok {
-		ipConn.SetWriteBuffer(128 * 1024)
-	}
 	br := bufio.NewReader(c)
 	bw := bufio.NewWriter(c)
 	timeout := time.Duration(0)
