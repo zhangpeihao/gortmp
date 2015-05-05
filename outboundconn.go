@@ -5,6 +5,7 @@ package gortmp
 import (
 	"bufio"
 	"bytes"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"github.com/zhangpeihao/goamf"
@@ -72,10 +73,15 @@ func Dial(url string, handler OutboundConnHandler, maxChannelNumber int) (Outbou
 	if err != nil {
 		return nil, err
 	}
-	if rtmpURL.protocol != "rtmp" {
-		return nil, errors.New(fmt.Sprintf("Unsupport protocol %s", rtmpURL.protocol))
+	var c net.Conn
+	switch rtmpURL.protocol {
+	case "rtmp":
+		c, err = net.Dial("tcp", fmt.Sprintf("%s:%d", rtmpURL.host, rtmpURL.port))
+	case "rtmps":
+		c, err = tls.Dial("tcp", fmt.Sprintf("%s:%d", rtmpURL.host, rtmpURL.port), &tls.Config{InsecureSkipVerify: true})
+	default:
+		err = errors.New(fmt.Sprintf("Unsupport protocol %s", rtmpURL.protocol))
 	}
-	c, err := net.Dial("tcp", fmt.Sprintf("%s:%d", rtmpURL.host, rtmpURL.port))
 	if err != nil {
 		return nil, err
 	}
