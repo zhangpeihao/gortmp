@@ -484,6 +484,8 @@ func (conn *conn) CreateMediaChunkStream() (*OutboundChunkStream, error) {
 			newChunkStreamID = uint32((index+1)*6 + 2)
 			logger.ModulePrintf(logHandler, log.LOG_LEVEL_DEBUG,
 				"index: %d, newChunkStreamID: %d\n", index, newChunkStreamID)
+			// since allocate a newChunkStreamID, why not set the cocupited to true
+			conn.mediaChunkStreamIDAllocator[index] = true
 			break
 		}
 	}
@@ -510,8 +512,10 @@ func (conn *conn) InboundChunkStream(id uint32) (chunkStream *InboundChunkStream
 }
 
 func (conn *conn) CloseMediaChunkStream(id uint32) {
+	// and the id is not the index of Allocator slice
+	index := (id - 2) / 6 - 1
 	conn.mediaChunkStreamIDAllocatorLocker.Lock()
-	conn.mediaChunkStreamIDAllocator[id] = false
+	conn.mediaChunkStreamIDAllocator[index] = false
 	conn.mediaChunkStreamIDAllocatorLocker.Unlock()
 	conn.CloseChunkStream(id)
 }
