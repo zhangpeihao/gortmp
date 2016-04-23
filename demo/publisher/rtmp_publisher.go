@@ -3,11 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/zhangpeihao/goflv"
-	rtmp "github.com/zhangpeihao/gortmp"
-	"github.com/zhangpeihao/log"
 	"os"
 	"time"
+
+	rtmp "github.com/zhangpeihao/gortmp"
+	"github.com/zhangpeihao/log"
 )
 
 const (
@@ -18,7 +18,7 @@ const (
 var (
 	url         *string = flag.String("URL", "rtmp://192.168.20.111/vid3", "The rtmp url to connect.")
 	streamName  *string = flag.String("Stream", "camstream", "Stream name to play.")
-	flvFileName *string = flag.String("FLV", "", "Dump FLV into file.")
+	flvFileName *string = flag.String("FLV", "", "FLV file to publishs.")
 )
 
 type TestOutboundConnHandler struct {
