@@ -38,7 +38,7 @@ var status uint
 
 func (handler *TestOutboundConnHandler) OnStatus(conn rtmp.OutboundConn) {
 	var err error
-	status, err = obConn.Status()
+	status, err = conn.Status()
 	fmt.Printf("@@@@@@@@@@@@@status: %d, err: %v\n", status, err)
 }
 
@@ -77,6 +77,7 @@ func main() {
 	}
 	flag.Parse()
 
+	fmt.Printf("rtmp:%s stream:%s flv:%s\r\n", *url,*streamName,*dumpFlv)
 	l := log.NewLogger(".", "player", nil, 60, 3600*24, true)
 	rtmp.InitLogger(l)
 	defer l.Close()
