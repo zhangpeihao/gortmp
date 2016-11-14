@@ -6,13 +6,14 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/zhangpeihao/goflv"
-	rtmp "github.com/zhangpeihao/gortmp"
-	"github.com/zhangpeihao/log"
 	"io"
 	"net"
 	"os"
 	"time"
+
+	"github.com/zhangpeihao/goflv"
+	rtmp "github.com/zhangpeihao/gortmp"
+	"github.com/zhangpeihao/log"
 )
 
 const (
@@ -38,7 +39,7 @@ var status uint
 
 func (handler *TestOutboundConnHandler) OnStatus(conn rtmp.OutboundConn) {
 	var err error
-	status, err = obConn.Status()
+	status, err = conn.Status()
 	fmt.Printf("@@@@@@@@@@@@@status: %d, err: %v\n", status, err)
 }
 
@@ -50,12 +51,12 @@ func (handler *TestOutboundConnHandler) OnReceived(conn rtmp.Conn, message *rtmp
 	switch message.Type {
 	case rtmp.VIDEO_TYPE:
 		if flvFile != nil {
-			flvFile.WriteVideoTag(message.Buf.Bytes(), message.Timestamp)
+			flvFile.WriteVideoTag(message.Buf.Bytes(), message.AbsoluteTimestamp)
 		}
 		videoDataSize += int64(message.Buf.Len())
 	case rtmp.AUDIO_TYPE:
 		if flvFile != nil {
-			flvFile.WriteAudioTag(message.Buf.Bytes(), message.Timestamp)
+			flvFile.WriteAudioTag(message.Buf.Bytes(), message.AbsoluteTimestamp)
 		}
 		audioDataSize += int64(message.Buf.Len())
 	}
@@ -77,6 +78,7 @@ func main() {
 	}
 	flag.Parse()
 
+	fmt.Printf("rtmp:%s stream:%s flv:%s\r\n", *url, *streamName, *dumpFlv)
 	l := log.NewLogger(".", "player", nil, 60, 3600*24, true)
 	rtmp.InitLogger(l)
 	defer l.Close()
