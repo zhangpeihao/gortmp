@@ -638,7 +638,7 @@ func (conn *conn) received(message *Message) {
 				conn.invokeSetPeerBandwidth(message)
 			default:
 				logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-					"Unkown message type %d in Protocol control chunk stream!\n", message.Type)
+					"Unknown message type %d in Protocol control chunk stream!\n", message.Type)
 			}
 		case CS_ID_COMMAND:
 			if message.StreamID == 0 {
@@ -681,7 +681,7 @@ func (conn *conn) received(message *Message) {
 					}
 				default:
 					logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-						"Unkown message type %d in Command chunk stream!\n", message.Type)
+						"Unknown message type %d in Command chunk stream!\n", message.Type)
 				}
 				conn.invokeCommand(cmd)
 			} else {
